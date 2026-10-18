@@ -441,7 +441,8 @@ async function boot() {
     $('#sound-gate').classList.add('is-hidden');
   });
   // 어디든 처음 누를 때 소리를 깨워 둔다
-  window.addEventListener('pointerdown', () => audio.unlock(), { once: true, capture: true });
+  // 터치마다 소리를 깨운다 — 녹음 뒤 작아진 소리도 다음 터치에서 새 엔진으로 되돌아온다
+  window.addEventListener('pointerdown', () => audio.unlock(), { capture: true });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) audio.stop();
   });

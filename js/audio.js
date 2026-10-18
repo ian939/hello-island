@@ -5,6 +5,9 @@
  * - 새 소리를 틀면 앞 소리는 바로 끈다 (빠르게 연타해도 겹치지 않게).
  * - 재생이 막히면 조용히 넘어가지 않고 '눌러서 소리 켜기' 버튼을 띄운다 (onBlocked).
  * - 효과음은 파일 없이 만들고, 말소리보다 작게.
+ * - iPad Safari 버그: 마이크를 한 번 켰다 끄면 그 전에 만든 AudioContext 의 음량이 작게 남는다.
+ *   녹음 뒤에는 markStale() 로 표시해 두고, 다음 터치(unlock) 때 AudioContext 를 새로 만든다.
+ *   (새 AudioContext 는 터치 안에서 만들어야 iPad 가 소리를 허락한다)
  */
 
 let ctx = null;
@@ -13,6 +16,7 @@ let sfxGain = null;
 let current = null;
 let token = 0;
 let muted = false;
+let stale = false; // 녹음 뒤 — 다음 터치에서 소리 엔진을 새로 만든다
 const buffers = new Map();
 
 export const audioState = { onBlocked: null, onSpeaking: null };
@@ -22,17 +26,43 @@ function ensure() {
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return null;
   ctx = new AC();
+  // 말소리는 조금 키우고, 압축기로 깨지지 않게 (패드 스피커에서 작게 들리지 않게)
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -14;
+  comp.knee.value = 8;
+  comp.ratio.value = 4;
+  comp.attack.value = 0.003;
+  comp.release.value = 0.2;
+  comp.connect(ctx.destination);
   voiceGain = ctx.createGain();
-  voiceGain.gain.value = 1;
-  voiceGain.connect(ctx.destination);
+  voiceGain.gain.value = 1.8;
+  voiceGain.connect(comp);
   sfxGain = ctx.createGain();
   sfxGain.gain.value = 0.18;
   sfxGain.connect(ctx.destination);
   return ctx;
 }
 
+/** 녹음이 끝났다 — 다음 터치에서 소리 엔진을 새로 만든다 */
+export function markStale() {
+  stale = true;
+}
+
+function rebuild() {
+  stop();
+  try {
+    if (ctx) ctx.close();
+  } catch (e) {
+    /* 이미 닫힘 */
+  }
+  ctx = null;
+  buffers.clear(); // 새 엔진에서 다시 풀어 쓴다
+  stale = false;
+}
+
 /** 반드시 터치 이벤트 안에서 부른다 */
 export function unlock() {
+  if (stale) rebuild();
   const c = ensure();
   if (!c) return;
   // iPadOS 17+: 처음부터 '재생' 세션으로 (녹음 뒤 작아진 소리도 여기서 되돌아온다)

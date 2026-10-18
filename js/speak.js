@@ -2,11 +2,11 @@
  *
  * - 녹음: MediaRecorder (자기 목소리 다시 듣기용)
  * - 판정: 브라우저 음성 인식(SpeechRecognition). 아이패드 Safari 는 Apple 서버에서 인식하므로 인터넷이 필요하다.
- * - 점수: 문장 낱말 중 순서대로 맞게 말한 비율. 70% 이상이면 통과.
+ * - 점수: 문장 낱말 중 순서대로 맞게 말한 비율. 25% 이상이면 통과.
  * 인식이 안 되는 기기·오프라인·마이크 거부일 때는 isAvailable() 이 false → 따라 말하기를 건너뛴다.
  */
 
-export const PASS = 0.7;
+export const PASS = 0.25; // 문장의 1/4 만 따라 해도 통과 — 말해 본 것 자체를 칭찬한다
 export const MAX_TRIES = 3;
 const MAX_MS = 8000;
 

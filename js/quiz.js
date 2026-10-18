@@ -388,10 +388,11 @@ function showSentence(w, next) {
       mic.append(micIcon(), micLabel);
       const meter = el('div', 'speak-meter');
       const meterFill = el('i');
-      const meterText = el('span', null, `${Math.round(speak.PASS * 100)}% 넘으면 통과`);
+      const meterText = el('span', null, '말해 보면 점수가 나와');
+      meter.style.setProperty('--pass', `${speak.PASS * 100}%`);
       meter.append(meterFill, meterText);
       const sayLine = el('p', 'speak-say', '문장을 듣고 똑같이 말해 봐!');
-      const mine = button('helper is-hidden', null, () => mineUrl && playWith(mine, mineUrl));
+      const mine = button('helper is-hidden');
       mine.append(earIcon(), document.createTextNode('내 목소리'));
       const tools = el('div', 'helper-row');
       tools.append(again, mine);
@@ -402,20 +403,67 @@ function showSentence(w, next) {
         if (mineUrl) URL.revokeObjectURL(mineUrl);
       }, { once: true });
 
+      let pending = null; // 듣기 전 결과 — 내 목소리를 들은 뒤에 발표한다
+
+      // 내 목소리 듣기: 아이가 직접 누른다. 그 터치에서 소리 엔진을 새로 만들어 녹음 뒤에도 소리가 작아지지 않게.
+      mine.onclick = async () => {
+        if (!mineUrl || listening) return;
+        mine.classList.remove('is-call');
+        await playWith(mine, mineUrl);
+        if (pending) {
+          const r = pending;
+          pending = null;
+          announce(r);
+        }
+      };
+
+      // 내 목소리를 들은 뒤에 점수와 맞힌 낱말을 보여 준다
+      const announce = (r) => {
+        const pct = Math.round(r.ratio * 100);
+        line.paint(r.hit);
+        meterFill.style.width = `${pct}%`;
+        meterText.textContent = `${pct}%`;
+        meter.classList.toggle('is-pass', r.ratio >= speak.PASS);
+        mic.disabled = false;
+        if (r.ratio >= speak.PASS) {
+          const [text, voice] = praise(pct);
+          audio.sfx('star');
+          setTimeout(() => audio.play(audio.uiSrc(voice)), 250);
+          sayLine.textContent = text;
+          sayLine.classList.add('is-praise');
+          micLabel.textContent = '한 번 더 말하기';
+          if (!passed && sess) sess.speakPass = (sess.speakPass || 0) + 1;
+          passed = true;
+          ready();
+        } else if (tries < speak.MAX_TRIES && !passed) {
+          sayLine.textContent = `소리가 잘 안 들렸어. 조금 크게 한 번 더! (${tries}/${speak.MAX_TRIES})`;
+          micLabel.textContent = '다시 말하기';
+        } else {
+          sayLine.textContent = '잘했어! 다음에 또 해 보자';
+          sayLine.classList.add('is-praise');
+          setTimeout(() => audio.play(audio.uiSrc('nice')), 250);
+          micLabel.textContent = '한 번 더 말하기';
+          ready();
+        }
+        app.save();
+      };
+
       mic.addEventListener('click', async () => {
         if (listening) {
           listening.stop();
           return;
         }
         audio.stop();
-        audio.unlock();
         tries += 1;
+        pending = null;
+        sayLine.classList.remove('is-praise');
         mic.classList.add('is-on');
         micLabel.textContent = '다 말했어';
         sayLine.textContent = '말해 봐! 다 말하면 버튼을 눌러';
         listening = speak.listenOnce();
         const res = await listening.done;
         listening = null;
+        audio.markStale(); // 마이크를 쓴 뒤 — 다음 터치에서 소리 엔진을 새로 만든다
         mic.classList.remove('is-on');
         if (!document.body.contains(mic)) return; // 그새 창이 닫혔다
         if (res.error) {
@@ -427,44 +475,32 @@ function showSentence(w, next) {
           return;
         }
         const r = speak.bestOf(w.sentence, res.transcripts);
-        line.paint(r.hit);
-        const pct = Math.round(r.ratio * 100);
-        meterFill.style.width = `${pct}%`;
-        meterText.textContent = `${pct}%`;
-        meter.classList.toggle('is-pass', r.ratio >= speak.PASS);
+        micLabel.textContent = '따라 말하기';
         if (mineUrl) URL.revokeObjectURL(mineUrl);
         mineUrl = res.url;
-        if (mineUrl) mine.classList.remove('is-hidden');
         recordSpeak(w.id, r.ratio, tries);
 
-        // 내 목소리를 한 번 들어 본 뒤에 결과
-        mic.disabled = true;
         if (mineUrl) {
-          sayLine.textContent = '내 목소리를 들어 보자';
-          await playWith(mine, mineUrl);
-        }
-        mic.disabled = false;
-        if (r.ratio >= speak.PASS) {
-          audio.sfx('star');
-          sayLine.textContent = `잘했어! ${pct}% 따라 말했어`;
-          micLabel.textContent = '한 번 더 말하기';
-          if (!passed && sess) sess.speakPass = (sess.speakPass || 0) + 1;
-          passed = true;
-          ready();
-        } else if (tries < speak.MAX_TRIES && !passed) {
-          sayLine.textContent = `조금만 더! 문장을 다시 듣고 말해 봐 (${tries}/${speak.MAX_TRIES})`;
-          micLabel.textContent = '다시 말하기';
-        } else {
-          if (!passed) sayLine.textContent = '잘했어! 다음에 또 해 보자';
-          micLabel.textContent = '한 번 더 말하기';
-          ready();
-        }
-        app.save();
+          // 내 목소리를 한 번 들어야 결과가 나온다
+          mine.classList.remove('is-hidden');
+          mine.classList.add('is-call');
+          mic.disabled = true;
+          sayLine.textContent = '내 목소리를 눌러서 들어 봐!';
+          pending = r;
+        } else announce(r);
       });
     },
     { dismissable: false },
   );
   audio.play(audio.sentenceSrc(w.id));
+}
+
+/* 점수에 맞춘 칭찬 [문구, 칭찬 음성] — 25% 만 넘어도 칭찬한다 */
+function praise(pct) {
+  if (pct >= 90) return [`완벽해! ${pct}%! 영어 박사네!`, 'wow'];
+  if (pct >= 70) return [`정말 잘했어! ${pct}% 따라 말했어!`, 'great'];
+  if (pct >= 50) return [`멋져! ${pct}%! 목소리가 또렷해!`, 'yes'];
+  return [`좋아! ${pct}%! 용감하게 말했어!`, 'nice'];
 }
 
 /* 따라 말하기 기록 (보호자 화면용) */

@@ -313,6 +313,7 @@ test('따라 말하기 점수: 순서대로 맞힌 낱말 비율, 숫자·축약
   assert.equal(score('The cat says meow.', 'meow says cat the').ratio, 0.25); // 순서가 뒤죽박죽이면 낮게
   const b = bestOf('The dog says woof.', ['the doc says', 'the dog says woof']);
   assert.equal(b.ratio, 1);
-  assert.ok(score('The dog says woof.', 'the dog says').ratio >= PASS); // 4낱말 중 3개 = 75% 통과
-  assert.ok(score('The dog says woof.', 'the dog').ratio < PASS);
+  assert.ok(score('The dog says woof.', 'dog').ratio >= PASS); // 4낱말 중 1개 = 25% 통과
+  assert.ok(score('The dog says woof.', '').ratio < PASS);
+assert.ok(score('Our solar system has eight planets.', 'our').ratio < PASS); // 6낱말 중 1개 = 17%
 });
