@@ -337,7 +337,7 @@ async function cacheAll(btn) {
   }
   for (const k of ['welcome', 'whats_this', 'listen_choose', 'meet', 'great', 'yes', 'nice', 'wow', 'new_friend', 'again', 'break', 'done', 'gate', 'portal']) urls.add(`assets/audio/ui/${k}.mp3`);
   const list = [...urls];
-  const cache = await caches.open('hello-island-assets-v1');
+  const cache = await caches.open('hello-island-assets-v2');
   btn.disabled = true;
   let done = 0;
   const step = 12;
