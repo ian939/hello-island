@@ -6,8 +6,8 @@ import { readFileSync } from 'node:fs';
 import { buildContent } from '../js/engine/content.js';
 import { blankState, migrate } from '../js/engine/state.js';
 import { makeRng, addDays } from '../js/engine/util.js';
-import { planDaily, planGate, canPair, pickOptions } from '../js/engine/plan.js';
-import { createSession, currentCard, present, submit, advanceIntro, extendSession } from '../js/engine/session.js';
+import { planSession, planGate, canPair, pickOptions } from '../js/engine/plan.js';
+import { createSession, currentCard, present, submit, advanceIntro } from '../js/engine/session.js';
 import { refreshUnlocks, completeStage, stageTotals } from '../js/engine/map.js';
 import { recordCorrect, level, isMastered, getProgress } from '../js/engine/progress.js';
 
@@ -25,10 +25,10 @@ function fresh(content) {
   return st;
 }
 
-function newDaily(content, st, target, seed = 1, today = '2026-10-18') {
+function newDaily(content, st, zoneId = null, seed = 1, today = '2026-10-18') {
   const rng = makeRng(seed);
-  const plan = planDaily(content, st, { target, today, rng });
-  const s = createSession(content, st, { sequence: plan.sequence, intro: plan.intro, target, today, rng });
+  const plan = planSession(content, st, { zoneId, today, rng });
+  const s = createSession(content, st, { sequence: plan.sequence, intro: plan.intro, zoneId, today, rng });
   while (s.status === 'intro') advanceIntro(st, s, today);
   return { s, rng };
 }
@@ -44,31 +44,45 @@ test('데이터: 395단어 · 155/120/120 · 7/8세 구역마다 20개', () => {
   assert.equal(new Set(c.list.map((w) => w.id)).size, 395);
 });
 
-test('목표 30/50/100 → 시작할 때 정확히 그 수의 카드', () => {
-  const c = allReady();
-  for (const target of [30, 50, 100]) {
-    const st = fresh(c);
-    const { s } = newDaily(c, st, target);
-    assert.equal(s.order.length, target);
-    assert.equal(s.target, target);
-  }
-});
-
-test('같은 단어는 3문제 안에 다시 나오지 않는다 (가능할 때)', () => {
+test('한 판 = 서로 다른 단어: 섬 전체 30장, 동물의 숲은 22장 전부', () => {
   const c = allReady();
   const st = fresh(c);
-  const { s } = newDaily(c, st, 30, 7);
-  const seq = s.order.map((id) => s.cards[id].word);
-  for (let i = 0; i < seq.length; i += 1) {
-    assert.notEqual(seq[i], seq[i + 1], `pos ${i}`);
-    assert.notEqual(seq[i], seq[i + 2], `pos ${i}`);
-  }
+  const { s } = newDaily(c, st);
+  const words = s.order.map((id) => s.cards[id].word);
+  assert.equal(words.length, 30);
+  assert.equal(new Set(words).size, 30);
+  assert.ok(s.intro.length <= 5);
+
+  const st2 = fresh(c);
+  const z = newDaily(c, st2, 'age6-animals').s;
+  const zw = z.order.map((id) => z.cards[id].word);
+  assert.equal(zw.length, 22);
+  assert.equal(new Set(zw).size, 22);
+  assert.ok(zw.every((id) => c.words[id].zone === 'age6-animals'));
+});
+
+test('판을 거듭하면 못 만난 단어로 넘어가고, 복습할 때 된 단어가 먼저 온다', () => {
+  const c = allReady();
+  const st = fresh(c);
+  const first = newDaily(c, st, null, 2);
+  const a = first.s.order.map((id) => first.s.cards[id].word);
+  while (first.s.order.length) submit(st, first.s, present(first.s, first.rng).word, T, first.rng);
+  // 같은 날 다시: 방금 30개는 아직 복습 날짜 전 → 새 단어가 먼저
+  const second = newDaily(c, st, null, 3, T);
+  const b = second.s.order.map((id) => second.s.cards[id].word);
+  assert.ok(b.filter((id) => a.includes(id)).length <= 5, 'mostly new words');
+  // 틀려서 복습 날짜가 된 단어는 다음 판에 뽑힌다
+  const missed = a[0];
+  st.words[missed].due = '2026-10-19';
+  st.words[missed].recent.push({ d: T, ok: false, h: false });
+  const third = newDaily(c, st, null, 4, '2026-10-19');
+  assert.ok(third.s.order.some((id) => third.s.cards[id].word === missed));
 });
 
 test('30문제에서 3번 틀려도 30장을 모두 맞혀야 끝난다 (답 33번)', () => {
   const c = allReady();
   const st = fresh(c);
-  const { s, rng } = newDaily(c, st, 30, 3);
+  const { s, rng } = newDaily(c, st, null, 3);
   let wrongs = 0;
   let guard = 0;
   while (s.order.length && guard < 500) {
@@ -89,7 +103,7 @@ test('30문제에서 3번 틀려도 30장을 모두 맞혀야 끝난다 (답 33�
 test('틀린 카드는 4~7장 뒤로, 남은 카드가 적으면 가장 뒤로, 마지막 한 장이면 바로 다시', () => {
   const c = allReady();
   const st = fresh(c);
-  const { s, rng } = newDaily(c, st, 30, 11);
+  const { s, rng } = newDaily(c, st, null, 11);
   const card = present(s, rng);
   const r = submit(st, s, card.options.find((o) => o !== card.word), T, rng);
   assert.ok(r.requeuedAt >= 3 && r.requeuedAt <= 8, `at ${r.requeuedAt}`);
@@ -108,7 +122,7 @@ test('틀린 카드는 4~7장 뒤로, 남은 카드가 적으면 가장 뒤로, 
 test('두 번 틀린 카드는 보기가 하나 줄어든다 (최소 2개)', () => {
   const c = allReady();
   const st = fresh(c);
-  const { s, rng } = newDaily(c, st, 30, 5);
+  const { s, rng } = newDaily(c, st, null, 5);
   const target = present(s, rng);
   const n0 = target.options.length;
   for (let i = 0; i < 2; i += 1) {
@@ -148,20 +162,22 @@ test('보기: 정답 1개 · 중복 없음 · 헷갈리는 짝 없음 · 같은 
 test('정답 위치가 늘 같은 칸에 몰리지 않는다', () => {
   const c = allReady();
   const st = fresh(c);
-  const { s, rng } = newDaily(c, st, 100, 21);
   const counts = [0, 0, 0];
-  let prev = -1;
   let repeats = 0;
-  while (s.order.length) {
-    const k = present(s, rng);
-    const at = k.options.indexOf(k.word);
-    counts[at] += 1;
-    if (at === prev) repeats += 1;
-    prev = at;
-    submit(st, s, k.word, T, rng);
+  for (let round = 0; round < 4; round += 1) {
+    const { s, rng } = newDaily(c, st, null, 21 + round);
+    let prev = -1;
+    while (s.order.length) {
+      const k = present(s, rng);
+      const at = k.options.indexOf(k.word);
+      counts[at] += 1;
+      if (at === prev) repeats += 1;
+      prev = at;
+      submit(st, s, k.word, T, rng);
+    }
   }
-  for (const n of counts) assert.ok(n > 20, counts.join('/'));
-  assert.ok(repeats < 10, `repeats ${repeats}`);
+  for (const n of counts) assert.ok(n > 25, counts.join('/'));
+  assert.ok(repeats < 15, `repeats ${repeats}`);
 });
 
 test('도감 최초 수집은 한 번만, 숙련은 서로 다른 날짜가 쌓여야', () => {
@@ -234,10 +250,11 @@ test('7세 맵: 6세 복습이 약 30% 섞이고, 복습 정답이 7세 수집 �
   const st = fresh(c);
   c.byStage.age6.forEach((id) => recordCorrect(st, id, { attempts: 1, hints: 0 }, '2026-10-01'));
   completeStage(c, st, 'age6');
-  const { s, rng } = newDaily(c, st, 50, 4);
+  const { s, rng } = newDaily(c, st, null, 4);
   const words = Object.values(s.cards).map((k) => k.word);
   const six = words.filter((id) => c.words[id].stage === 'age6').length;
-  assert.ok(six >= 10 && six <= 20, `age6 cards ${six}/50`);
+  assert.equal(words.length, 30);
+  assert.ok(six >= 7 && six <= 11, `age6 cards ${six}/30`);
   const before = stageTotals(c, st, 'age7').found;
   while (s.order.length) {
     const k = present(s, rng);
@@ -254,7 +271,7 @@ test('출제 불가(준비 안 됨·제외) 단어는 카드에도 보기에도 
   const st = fresh(c);
   const excluded = c.byStage.age6[1];
   st.flags[excluded] = 'exclude';
-  const { s } = newDaily(c, st, 100, 8);
+  const { s } = newDaily(c, st, null, 8);
   for (const k of Object.values(s.cards)) {
     for (const o of [k.word, ...k.options]) {
       assert.ok(c.words[o].ready, o);
@@ -263,22 +280,10 @@ test('출제 불가(준비 안 됨·제외) 단어는 카드에도 보기에도 
   }
 });
 
-test('목표를 30→50으로 늘리면 맞힌 30장은 그대로, 20장만 더한다', () => {
-  const c = allReady();
-  const st = fresh(c);
-  const { s, rng } = newDaily(c, st, 30, 6);
-  while (s.order.length) submit(st, s, present(s, rng).word, T, rng);
-  const plan = planDaily(c, st, { target: 20, today: T, rng, newLimit: 0 });
-  extendSession(c, st, s, plan.sequence, rng);
-  assert.equal(s.done, 30);
-  assert.equal(s.target, 50);
-  assert.equal(s.order.length, 20);
-});
-
 test('저장 상태: 저장→복원 후 남은 카드·오답 큐·수집 기록이 그대로', () => {
   const c = allReady();
   const st = fresh(c);
-  const { s, rng } = newDaily(c, st, 30, 12);
+  const { s, rng } = newDaily(c, st, null, 12);
   st.session = s;
   for (let i = 0; i < 5; i += 1) submit(st, s, present(s, rng).word, T, rng);
   const k = present(s, rng);

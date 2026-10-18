@@ -7,9 +7,7 @@ export function blankState() {
   return {
     schema: SCHEMA,
     settings: {
-      goal: 30, // 30 / 50 / 100
       choices: 3, // 3 또는 4
-      newPerDay: null, // null = 목표에 맞춰 5/7/10
       slow: false, // 느린 발음을 기본으로
       muted: false,
       calm: false, // 움직임 줄이기

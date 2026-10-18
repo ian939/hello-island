@@ -1,15 +1,17 @@
-/* 오늘의 카드 고르기 · 보기 만들기
+/* 한 판의 카드 고르기 · 보기 만들기
  *
- * 30/50/100 은 '목표 카드 수'다. 새 단어 수와는 따로 간다 (기본 5/7/10개).
- * 새 단어는 그날 최소 두 번 다른 카드로 만나고, 나머지는 복습할 단어로 채운다.
+ * 한 판 = 서로 다른 단어 10~30개 (같은 단어를 한 판에 두 번 내지 않는다).
+ * 구역을 고르면 그 구역 단어 전부(동물의 숲 22개면 22장), 섬 전체면 30장.
+ * 고르는 순서: 복습할 때가 된·최근 틀린 단어 → 아직 못 만난 단어 → 나머지.
  * 7·8세 맵에서는 이전 맵 단어를 정해진 비율(70/30, 70/20/10)로 섞는다.
+ * 틀린 카드만 같은 판에서 4~7장 뒤에 다시 나온다.
  */
 import { daysBetween, shuffle } from './util.js';
 import { isMastered } from './progress.js';
 
-export const NEW_LIMIT = { 30: 5, 50: 7, 100: 10 };
-const MIN_DISTINCT = 8; // 첫날처럼 아는 단어가 거의 없을 때 한 세션에 최소 이만큼은 섞는다
-const GAP = 3; // 같은 단어는 3문제 안에 다시 나오지 않게
+export const MAX_CARDS = 30;
+export const MIN_CARDS = 10;
+export const INTRO_LIMIT = 5; // 판 시작 전에 미리 만나는 새 단어는 최대 5개
 
 export const flagOf = (state, id) => (state.flags && state.flags[id]) || null;
 
@@ -24,31 +26,6 @@ export function playable(content, state, id) {
   return Boolean(w && w.ready && flagOf(state, id) !== 'exclude' && state.map.unlockedZones.includes(w.zone));
 }
 
-export function pickNewWords(content, state, { stageId, zoneId = null, limit }) {
-  const fresh = (content.byStage[stageId] || []).filter((id) => playable(content, state, id) && !isSeen(state, id));
-  if (limit <= 0 || !fresh.length) return [];
-  const zoneIndex = (id) => content.zones[content.words[id].zone].index;
-  const focus = zoneId ? fresh.filter((id) => content.words[id].zone === zoneId) : [];
-  const rest = fresh.filter((id) => !focus.includes(id));
-
-  // 쉬운 단계(tier)부터, 구역을 돌아가며 하나씩 — 하루에 동물만 다섯 개가 되지 않게
-  const byZone = new Map();
-  rest
-    .sort((a, b) => content.words[a].tier - content.words[b].tier || zoneIndex(a) - zoneIndex(b) || content.words[a].no - content.words[b].no)
-    .forEach((id) => {
-      const key = `${content.words[id].tier}:${content.words[id].zone}`;
-      if (!byZone.has(key)) byZone.set(key, []);
-      byZone.get(key).push(id);
-    });
-  const ordered = [];
-  const tiers = [...new Set(rest.map((id) => content.words[id].tier))].sort();
-  for (const tier of tiers) {
-    const lanes = [...byZone.entries()].filter(([k]) => k.startsWith(`${tier}:`)).map(([, v]) => v.slice());
-    while (lanes.some((l) => l.length)) for (const l of lanes) if (l.length) ordered.push(l.shift());
-  }
-  return focus.sort((a, b) => content.words[a].no - content.words[b].no).concat(ordered).slice(0, limit);
-}
-
 export function reviewScore(p, today, rng) {
   let s = rng() * 0.8;
   if (!p) return s + 2;
@@ -61,31 +38,74 @@ export function reviewScore(p, today, rng) {
   return s;
 }
 
-/** 단어별 출제 횟수 → 카드 순서. 같은 단어는 GAP 문제 안에 다시 놓지 않는다. */
-export function arrange(counts, rng) {
-  const left = new Map(counts);
-  const last = new Map();
-  const total = [...left.values()].reduce((a, b) => a + b, 0);
+/** 한 단계(맵)의 후보를 우선순위대로: 복습할 때 된 단어 → 못 만난 단어 → 나머지 */
+function rankStage(content, state, ids, today, rng) {
+  const seen = ids.filter((id) => isSeen(state, id));
+  const scored = seen.map((id) => ({ id, s: reviewScore(state.words[id], today, rng) })).sort((a, b) => b.s - a.s);
+  const urgent = scored.filter((x) => x.s >= 2.8).map((x) => x.id);
+  const rest = scored.filter((x) => x.s < 2.8).map((x) => x.id);
+  const fresh = orderFresh(content, ids.filter((id) => !isSeen(state, id)));
+  return [...urgent, ...fresh, ...rest];
+}
+
+/** 아직 못 만난 단어: 쉬운 단계(tier)부터, 구역을 돌아가며 하나씩 */
+function orderFresh(content, ids) {
+  const zoneIndex = (id) => content.zones[content.words[id].zone].index;
+  const lanes = new Map();
+  ids
+    .slice()
+    .sort((a, b) => content.words[a].tier - content.words[b].tier || zoneIndex(a) - zoneIndex(b) || content.words[a].no - content.words[b].no)
+    .forEach((id) => {
+      const key = `${content.words[id].tier}:${content.words[id].zone}`;
+      if (!lanes.has(key)) lanes.set(key, []);
+      lanes.get(key).push(id);
+    });
   const out = [];
-  for (let pos = 0; pos < total; pos += 1) {
-    const live = [...left.entries()].filter(([, n]) => n > 0).map(([id]) => id);
-    let pool = live.filter((id) => !last.has(id) || pos - last.get(id) >= GAP);
-    if (!pool.length) pool = live.filter((id) => last.get(id) !== pos - 1);
-    if (!pool.length) pool = live;
-    let best = null;
-    let bestW = -1;
-    for (const id of pool) {
-      const w = left.get(id) + rng() * 0.9;
-      if (w > bestW) {
-        bestW = w;
-        best = id;
-      }
-    }
-    out.push(best);
-    left.set(best, left.get(best) - 1);
-    last.set(best, pos);
+  const tiers = [...new Set(ids.map((id) => content.words[id].tier))].sort();
+  for (const tier of tiers) {
+    const ls = [...lanes.entries()].filter(([k]) => k.startsWith(`${tier}:`)).map(([, v]) => v);
+    while (ls.some((l) => l.length)) for (const l of ls) if (l.length) out.push(l.shift());
   }
   return out;
+}
+
+/**
+ * 한 판 계획. 서로 다른 단어 최대 30개.
+ * @returns {{sequence:string[], intro:string[]}|null}  null = 출제할 단어가 없음
+ */
+export function planSession(content, state, { zoneId = null, today, rng, max = MAX_CARDS }) {
+  const stageId = state.map.current;
+  const open = (sid) => (content.byStage[sid] || []).filter((id) => playable(content, state, id));
+  let picked = [];
+
+  if (zoneId) {
+    // 고른 구역 단어 전부. 너무 적으면(제외 등) 같은 지도의 열린 구역에서 채운다.
+    picked = rankStage(content, state, (content.byZone[zoneId] || []).filter((id) => playable(content, state, id)), today, rng).slice(0, max);
+    if (picked.length < MIN_CARDS) {
+      const more = rankStage(content, state, open(stageId).filter((id) => !picked.includes(id)), today, rng);
+      picked = picked.concat(more.slice(0, MIN_CARDS - picked.length));
+    }
+  } else {
+    const mix = content.mix[stageId] || { [stageId]: 100 };
+    const buckets = Object.entries(mix).map(([sid, pct]) => ({ sid, pct, list: rankStage(content, state, open(sid), today, rng) }));
+    const total = Math.min(max, buckets.reduce((a, b) => a + b.list.length, 0));
+    // 비율대로 나누고, 모자란 몫은 다른 단계에서 채운다
+    let given = 0;
+    buckets.forEach((b, i) => {
+      b.n = Math.min(b.list.length, i === buckets.length - 1 ? total - given : Math.round((total * b.pct) / 100));
+      given += b.n;
+    });
+    let short = total - buckets.reduce((a, b) => a + b.n, 0);
+    for (const b of buckets) {
+      const extra = Math.min(short, b.list.length - b.n);
+      b.n += extra;
+      short -= extra;
+    }
+    for (const b of buckets) picked = picked.concat(b.list.slice(0, b.n));
+  }
+  if (!picked.length) return null;
+  const intro = picked.filter((id) => !isSeen(state, id)).slice(0, INTRO_LIMIT);
+  return { sequence: shuffle(picked, rng), intro };
 }
 
 function sharesGroup(a, b) {
@@ -126,71 +146,6 @@ export function pickOptions(content, state, wordId, choices, rng) {
 
 export function choicesFor(state) {
   return state.settings.choices === 4 ? 4 : 3;
-}
-
-/**
- * 오늘의 카드 계획.
- * @returns {{sequence:string[], intro:string[]}|null}  null = 출제할 단어가 없음
- */
-export function planDaily(content, state, { target, zoneId = null, today, rng, newLimit }) {
-  const stageId = state.map.current;
-  const limit = newLimit ?? state.settings.newPerDay ?? NEW_LIMIT[target] ?? 5;
-  const seenNow = (content.byStage[stageId] || []).filter((id) => playable(content, state, id) && isSeen(state, id));
-  let fresh = pickNewWords(content, state, { stageId, zoneId, limit });
-  if (seenNow.length + fresh.length < MIN_DISTINCT) {
-    fresh = pickNewWords(content, state, { stageId, zoneId, limit: Math.max(limit, MIN_DISTINCT - seenNow.length) });
-  }
-
-  const counts = new Map();
-  const per = target >= fresh.length * 2 ? 2 : 1;
-  for (const id of fresh) counts.set(id, per);
-  let remaining = target - [...counts.values()].reduce((a, b) => a + b, 0);
-
-  // 단계 섞기 비율. 후보가 없는 단계 몫은 현재 단계로 넘긴다.
-  const mix = content.mix[stageId] || { [stageId]: 100 };
-  const buckets = [];
-  for (const [sid, pct] of Object.entries(mix)) {
-    const cands = (content.byStage[sid] || []).filter(
-      (id) => playable(content, state, id) && (isSeen(state, id) || fresh.includes(id)),
-    );
-    buckets.push({ sid, pct, cands });
-  }
-  const current = buckets.find((b) => b.sid === stageId);
-  for (const b of buckets) {
-    if (b !== current && !b.cands.length) {
-      current.pct += b.pct;
-      b.pct = 0;
-    }
-  }
-  if (!current.cands.length && !buckets.some((b) => b.cands.length)) {
-    return fresh.length ? { sequence: arrange(counts, rng), intro: fresh } : null;
-  }
-  if (!current.cands.length) {
-    // 현재 맵에 열린 단어가 없으면(드문 경우) 다른 단계에 몫을 나눈다
-    const alive = buckets.filter((b) => b.cands.length);
-    alive.forEach((b) => (b.pct += current.pct / alive.length));
-    current.pct = 0;
-  }
-
-  const live = buckets.filter((b) => b.pct > 0 && b.cands.length);
-  const totalPct = live.reduce((a, b) => a + b.pct, 0);
-  let given = 0;
-  live.forEach((b, i) => {
-    b.n = i === live.length - 1 ? remaining - given : Math.round((remaining * b.pct) / totalPct);
-    given += b.n;
-  });
-  for (const b of live) {
-    const ranked = b.cands
-      .map((id) => ({ id, s: reviewScore(state.words[id], today, rng) }))
-      .sort((x, y) => y.s - x.s)
-      .map((x) => x.id);
-    for (let k = 0; k < b.n; k += 1) {
-      const id = ranked[k % ranked.length];
-      counts.set(id, (counts.get(id) || 0) + 1);
-    }
-  }
-  remaining = 0;
-  return { sequence: arrange(counts, rng), intro: fresh.filter((id) => flagOf(state, id) !== 'known') };
 }
 
 /** 큰 맵 졸업 전 최종 복습: 그 맵에서 서로 다른 20단어를 구역마다 고르게 */

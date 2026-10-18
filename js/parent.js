@@ -6,8 +6,7 @@ import { artEl } from './art.js';
 import { $, el, button, openSheet, closeSheet, toast } from './ui.js';
 import { level, isMastered } from './engine/progress.js';
 import { stageTotals, parentUnlockStage, isStageOpen } from './engine/map.js';
-import { planDaily } from './engine/plan.js';
-import { extendSession, summarize } from './engine/session.js';
+import { summarize } from './engine/session.js';
 import { daysBetween } from './engine/util.js';
 import { exportBlob, importText, clearState } from './store.js';
 import { blankState } from './engine/state.js';
@@ -129,11 +128,6 @@ function renderParent() {
   wrap.appendChild(el('h2', null, '설정'));
   wrap.append(
     setting('보기 개수', '익숙해지면 4개로', seg([[3, '3개'], [4, '4개']], state.settings.choices, (v) => save((st) => (st.settings.choices = v)))),
-    setting(
-      '하루 새 단어',
-      '자동 = 목표 30/50/100에 5/7/10개',
-      seg([[null, '자동'], [3, '3'], [5, '5'], [7, '7'], [10, '10']], state.settings.newPerDay, (v) => save((st) => (st.settings.newPerDay = v))),
-    ),
     setting('보기를 누를 때 발음', '느리게 = 0.65배 속도', seg([[false, '보통'], [true, '느리게']], state.settings.slow, (v) => save((st) => (st.settings.slow = v)))),
     setting('움직임 줄이기', '그림이 계속 움직이지 않게', seg([[false, '끔'], [true, '켬']], state.settings.calm, (v) => {
       save((st) => (st.settings.calm = v));
@@ -148,22 +142,6 @@ function renderParent() {
   else {
     wrap.appendChild(el('p', 'p-note', `${s.date} 시작 · ${s.kind === 'gate' ? '최종 미션' : '오늘의 탐험'} · ${s.done}/${s.target}장 · 남은 카드 ${s.order.length}장`));
     const btns = el('div', 'p-buttons');
-    if (s.kind === 'daily') {
-      for (const n of [50, 100]) {
-        if (s.target < n) {
-          btns.appendChild(
-            button('btn', `목표를 ${n}장으로 늘리기`, () => {
-              const plan = planDaily(content, state, { target: n - s.target, today, rng: app.rng, newLimit: 0 });
-              if (!plan) return toast('더할 단어가 없어요');
-              extendSession(content, state, s, plan.sequence, app.rng);
-              app.save();
-              toast(`맞힌 ${s.done}장은 그대로, ${plan.sequence.length}장을 더했어요`);
-              renderParent();
-            }),
-          );
-        }
-      }
-    }
     btns.appendChild(
       button('btn btn--warn', '이 탐험 그만두고 새로 시작', () => {
         const sum = summarize(s);

@@ -816,3 +816,21 @@ img.art { display: block; width: 100%; height: 100%; object-fit: contain; }
 }
 body.is-calm *, body.is-calm *::before, body.is-calm *::after { animation-iteration-count: 1 !important; }
 body.is-calm [class^='mv-'], body.is-calm [class*=' mv-'] { animation: none !important; }
+
+/* ---------- 정답 뒤 문장 팝업 ---------- */
+.sheet--line { max-width: 560px; box-shadow: 9px 9px 0 var(--jade); }
+.line-en {
+  margin: 4px 0 12px;
+  font-family: var(--word); font-weight: 700;
+  font-size: clamp(30px, 5vw, 42px);
+  line-height: 1.2;
+}
+.line-en mark { padding: 0 6px; color: var(--ink); background: var(--marigold); border-bottom: 3px solid var(--ink); }
+.line-ko { margin: 0 0 14px; font-size: 20px; font-weight: 600; color: var(--ink-soft); word-break: keep-all; }
+.sheet--line .helper { margin-bottom: 14px; }
+.line-go { position: relative; overflow: hidden; }
+.line-go:disabled { background: var(--paper-2); color: #a2947c; box-shadow: 6px 6px 0 #cdbfa2; }
+/* 3초 동안 차오르는 막대 — 다 차면 '다음'이 켜진다 */
+.line-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 8px; background: transparent; }
+.line-bar b { display: block; width: 0; height: 100%; background: var(--jade); transition: width linear; }
+.line-go.is-ready .line-bar { display: none; }

@@ -11,7 +11,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'tools'))
-from curation import ART, CONFUSE, NUMBER_GAP, SENTENCE  # noqa: E402
+from curation import ART, CONFUSE, NUMBER_GAP  # noqa: E402
+from sentences import SENTENCES  # noqa: E402
 
 SEED = ROOT / 'tools' / 'seed'
 
@@ -46,23 +47,12 @@ def art_key(w):
     return f"{w['en']}/{w['world']}" if w['en'] == 'orange' else w['en']
 
 
-def article(en):
-    return 'an' if re.match(r'[aeiou]', en, re.I) else 'a'
-
-
 def sentence(w):
-    key = art_key(w)
-    if key in SENTENCE:
-        return SENTENCE[key]
-    if w['en'] in SENTENCE:
-        return SENTENCE[w['en']]
-    spec = ART[key]
-    if spec.startswith('C:'):
-        return f"It's {w['en']}!"
-    if spec.startswith('N:'):
-        n = int(spec[2:])
-        return f"I see {w['en']} {'apple' if n == 1 else 'apples'}!"
-    return f"It's {article(w['en'])} {w['en']}!"
+    """정답 팝업 문장 (영어, 한글). 그 단어가 문장 안에 들어 있어야 한다."""
+    en, ko = SENTENCES[art_key(w)]
+    if w['en'].lower() not in en.lower():
+        raise SystemExit(f"문장에 단어가 없음: {w['en']} → {en}")
+    return en, ko
 
 
 def art(w):
@@ -95,9 +85,9 @@ def main():
     words = seed['words']
 
     keys = {art_key(w) for w in words}
-    missing = keys - set(ART)
+    missing = (keys - set(ART)) | (keys - set(SENTENCES))
     if missing:
-        raise SystemExit(f'그림이 정해지지 않은 단어: {sorted(missing)}')
+        raise SystemExit(f'그림이나 문장이 정해지지 않은 단어: {sorted(missing)}')
 
     # 헷갈림 묶음: 단어 키 → 묶음 번호들
     groups = {}
@@ -124,7 +114,8 @@ def main():
             'pos': w['part_of_speech'],
             'art': a,
             'motion': motion(w),
-            'sentence': sentence(w),
+            'sentence': sentence(w)[0],
+            'sentenceKo': sentence(w)[1],
             'confuse': groups.get(art_key(w), []),
             'numberGap': NUMBER_GAP.get(w['stage_id'], 0) if ART[art_key(w)].startswith('N:') else 0,
             'value': int(ART[art_key(w)][2:]) if ART[art_key(w)].startswith('N:') else None,

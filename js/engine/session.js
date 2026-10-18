@@ -1,6 +1,6 @@
 /* 탐험 한 판(세션)의 카드 큐.
  *
- * - 시작할 때 정확히 N장(30/50/100)을 만든다. 오답 재도전은 '추가 출제'라 답한 횟수는 N보다 늘 수 있다.
+ * - 시작할 때 서로 다른 단어로 N장(10~30)을 만든다. 오답 재도전은 '추가 출제'라 답한 횟수는 N보다 늘 수 있다.
  * - 맞힌 카드는 완료, 틀린 카드는 4~7장 뒤에 다시 넣는다(남은 카드가 적으면 가능한 가장 뒤).
  * - 모든 카드를 맞혀야 끝난다. 마지막 한 장을 틀리면 바로 다시 나온다 (영원히 막히지 않게 도움을 준다).
  * - 매 답마다 저장해서, 앱을 닫았다 열어도 남은 카드와 오답 큐가 그대로 돌아온다.
@@ -145,17 +145,6 @@ export function submit(state, s, chosenId, today, rng) {
   }
   s.order.splice(at, 0, card.id);
   return { correct: false, discovered: false, finished: false, breakNow: false, card, requeuedAt: at };
-}
-
-/** 보호자가 목표를 늘렸다 (30 → 50): 이미 맞힌 카드는 그대로 두고 차이만큼 덧붙인다 */
-export function extendSession(content, state, s, sequence, rng) {
-  for (const wordId of sequence) {
-    const card = makeCard(content, state, wordId, rng);
-    s.cards[card.id] = card;
-    s.order.push(card.id);
-  }
-  s.target += sequence.length;
-  if (s.status === 'completed') s.status = 'playing';
 }
 
 /** 지난 판 요약 (보호자 기록용) */

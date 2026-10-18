@@ -7,7 +7,7 @@ import { loadState, saveState } from './store.js';
 import * as audio from './audio.js';
 import { artEl } from './art.js';
 import { $, el, button, tint, openSheet, closeSheet, toast, earIcon } from './ui.js';
-import { startDaily, startGate, resumeSession } from './quiz.js';
+import { startSession, startGate, resumeSession } from './quiz.js';
 import { openParent } from './parent.js';
 
 const EMBLEM = { age6: 'assets/ui/island.webp', age7: 'assets/ui/town.webp', age8: 'assets/ui/space.webp' };
@@ -124,7 +124,7 @@ function renderHome() {
     root.appendChild(cta);
   } else {
     const cta = button('cta', '탐험 시작', () => openGoalSheet(null));
-    cta.appendChild(el('small', null, `오늘 목표 고르기`));
+    cta.appendChild(el('small', null, '단어 친구 30명과 만나기'));
     root.appendChild(cta);
   }
 
@@ -208,9 +208,9 @@ function menuRow(label, meta, onClick) {
 const pad = (n) => String(n).padStart(3, '0');
 app.pad = pad;
 
-/* 오늘 몇 장? — 30/50/100. 같은 축하를 받는다 (100이 더 좋은 아이가 아니다). */
+/* 탐험 시작 — 섬 전체면 서로 다른 단어 30개, 구역이면 그 구역 단어 전부. 하던 판이 있으면 이어 하기부터. */
 function openGoalSheet(zoneId) {
-  const { state, content } = app;
+  const { state } = app;
   if (state.session && state.session.status !== 'completed') {
     openSheet((sh) => {
       sh.append(el('h2', 'sheet-title', '하던 탐험이 있어'), el('p', 'sheet-text', `${state.session.done} / ${state.session.target}장까지 했어.\n이어서 할까?`));
@@ -227,23 +227,9 @@ function openGoalSheet(zoneId) {
     });
     return;
   }
-  const zone = zoneId ? content.zones[zoneId] : null;
-  openSheet((sh) => {
-    sh.append(el('p', 'sheet-eyebrow', zone ? zone.title : content.stages.find((s) => s.id === state.map.current).short), el('h2', 'sheet-title', '오늘은 몇 장 할까?'));
-    const goals = el('div', 'goals');
-    for (const n of [30, 50, 100]) {
-      const g = button('goal', null, () => {
-        audio.unlock();
-        audio.sfx('tap');
-        closeSheet();
-        startDaily(n, zoneId);
-      });
-      g.append(el('b', null, String(n)), el('span', null, `장`));
-      if (n === state.settings.goal) g.appendChild(el('em', null, n === 30 ? '추천' : '늘 하던 것'));
-      goals.appendChild(g);
-    }
-    sh.append(goals, el('p', 'hint', '많이 고르면 중간에 쉬었다가 나중에 이어 해도 돼요.'), button('btn', '닫기', closeSheet));
-  });
+  audio.unlock();
+  audio.sfx('tap');
+  startSession(zoneId);
 }
 app.openGoalSheet = openGoalSheet;
 
@@ -415,13 +401,15 @@ function openDetail(id) {
     const art = el('div', 'detail-art');
     art.appendChild(artEl(w, { motion: !state.settings.calm }));
     const zone = content.zones[w.zone];
-    sh.append(art, el('h2', 'detail-word', w.en), el('p', 'detail-meta', `No. ${pad(w.no)} · ${zone.title}`), el('span', 'detail-level', LEVEL_TEXT[lv]));
+    const line = el('p', 'line-en', w.sentence);
+    line.style.fontSize = '24px';
+    sh.append(art, el('h2', 'detail-word', w.en), el('p', 'detail-meta', `No. ${pad(w.no)} · ${zone.title}`), el('span', 'detail-level', LEVEL_TEXT[lv]), line, el('p', 'line-ko', w.sentenceKo));
     const row = el('div', 'detail-buttons');
     const listen = button('helper', null, () => app.sayWord(id, { slow: false }));
     listen.append(earIcon(), document.createTextNode('듣기'));
     const slow = button('helper', null, () => app.sayWord(id, { slow: true }));
     slow.append(earIcon(), document.createTextNode('천천히'));
-    const sent = button('helper', null, () => audio.play([audio.wordSrc(id), audio.sentenceSrc(id)]));
+    const sent = button('helper', null, () => audio.play(audio.sentenceSrc(id)));
     sent.append(earIcon(), document.createTextNode('문장'));
     row.append(listen, slow, sent);
     sh.append(row, button('btn', '닫기', closeSheet));

@@ -8,7 +8,7 @@ import { app } from './app.js';
 import * as audio from './audio.js';
 import { artEl, artSrcs } from './art.js';
 import { $, el, button, tint, openSheet, closeSheet, toast, earIcon, checkIcon } from './ui.js';
-import { planDaily, planGate } from './engine/plan.js';
+import { planSession, planGate } from './engine/plan.js';
 import { createSession, currentCard, present, submit, useHint, advanceIntro, summarize } from './engine/session.js';
 import { refreshUnlocks, completeStage } from './engine/map.js';
 
@@ -16,16 +16,16 @@ const RIGHT_SAY = ['딩동! 맞았어', '잘 들었어!', '바로 그거야!', '
 const NEW_SAY = '새 친구를 만났어!';
 const WRONG_SAY = '괜찮아! 이 친구는 이따 다시 만나자';
 
-export function startDaily(target, zoneId = null) {
+/** 섬 전체(서로 다른 단어 30개) 또는 고른 구역(그 구역 단어 전부)으로 한 판 시작 */
+export function startSession(zoneId = null) {
   const { content, state } = app;
   const today = app.today();
-  state.settings.goal = target;
-  const plan = planDaily(content, state, { target, zoneId, today, rng: app.rng });
+  const plan = planSession(content, state, { zoneId, today, rng: app.rng });
   if (!plan) {
     toast('지금 열린 구역에 준비된 단어가 없어요');
     return;
   }
-  state.session = createSession(content, state, { sequence: plan.sequence, intro: plan.intro, target, zoneId, today, rng: app.rng });
+  state.session = createSession(content, state, { sequence: plan.sequence, intro: plan.intro, zoneId, today, rng: app.rng });
   app.save();
   resumeSession(true);
 }
@@ -245,9 +245,15 @@ function renderQuiz() {
       say.className = 'say';
       say.textContent = res.discovered ? NEW_SAY : RIGHT_SAY[s.done % RIGHT_SAY.length];
       if (!state.settings.calm) art.firstChild.classList.add(`mv-${w.motion}`);
-      const seq = [audio.wordSrc(card.word), audio.sentenceSrc(card.word)];
-      if (res.discovered) seq.push(audio.uiSrc('new_friend'));
-      after(audio.play(seq), res.finished ? finish : res.breakNow ? showBreak : renderQuiz, 700);
+      // 단어를 한 번 듣고 → 그 단어가 들어간 쉬운 문장 팝업
+      const next = res.finished ? finish : res.breakNow ? showBreak : renderQuiz;
+      const started = Date.now();
+      audio.play(audio.wordSrc(card.word)).then(() => {
+        const wait = Math.max(0, 900 - (Date.now() - started));
+        setTimeout(() => {
+          if (app.state.session === s) showSentence(w, next);
+        }, wait);
+      });
     } else {
       audio.sfx('wrong');
       rows.get(choice).classList.remove('is-picked');
@@ -277,6 +283,59 @@ function renderQuiz() {
       if (!moved && app.state.session === s) advanceTimer = setTimeout(move, pause);
     });
   }
+}
+
+/* ---------- 정답 뒤 문장 팝업 ----------
+ * 그 단어가 들어간 아주 쉬운 문장 + 한글 해석 + 문장 소리.
+ * '다음'은 3초 동안 잠겨 있다 (막대가 차오르면 눌러서 넘어간다). */
+const SENTENCE_LOCK_MS = 3000;
+
+function sentenceLine(w) {
+  const p = el('p', 'line-en');
+  const esc = w.en.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = new RegExp(`\\b${esc}\\w*`, 'i').exec(w.sentence);
+  if (!m) p.textContent = w.sentence;
+  else {
+    p.append(document.createTextNode(w.sentence.slice(0, m.index)), el('mark', null, m[0]), document.createTextNode(w.sentence.slice(m.index + m[0].length)));
+  }
+  return p;
+}
+
+function showSentence(w, next) {
+  openSheet(
+    (sh) => {
+      sh.classList.add('sheet--line');
+      const art = el('div', 'sheet-art');
+      art.appendChild(artEl(w, { motion: !app.state.settings.calm }));
+      const again = button('helper', null, () => playWith(again, audio.sentenceSrc(w.id)));
+      again.append(earIcon(), document.createTextNode('다시 듣기'));
+      const go = button('cta line-go', '다음 ▶');
+      go.disabled = true;
+      const fill = el('b');
+      const bar = el('i', 'line-bar');
+      bar.appendChild(fill);
+      go.appendChild(bar);
+      go.addEventListener('click', () => {
+        if (go.disabled) return;
+        audio.stop();
+        closeSheet();
+        next();
+      });
+      sh.append(art, sentenceLine(w), el('p', 'line-ko', w.sentenceKo), again, go);
+      // 3초 뒤에 '다음'이 켜진다
+      fill.style.transitionDuration = `${SENTENCE_LOCK_MS}ms`;
+      setTimeout(() => {
+        fill.getBoundingClientRect(); // 0% 상태를 한 번 그린 뒤에 늘려야 차오르는 게 보인다
+        fill.style.width = '100%';
+      }, 30);
+      setTimeout(() => {
+        go.disabled = false;
+        go.classList.add('is-ready');
+      }, SENTENCE_LOCK_MS);
+    },
+    { dismissable: false },
+  );
+  audio.play(audio.sentenceSrc(w.id));
 }
 
 /* ---------- 10장마다 쉬어 가기 ---------- */
