@@ -1,0 +1,399 @@
+{
+  "title": "Hello Island: age stages and unlock gates",
+  "version": "0.2.0",
+  "word_counts": {
+    "age6": 155,
+    "age7": 120,
+    "age8": 120,
+    "total": 395
+  },
+  "design_note_ko": "6/7/8은 강제 연령판정이 아니라 게임 안에서 보이는 난이도 단계명. 보호자 설정으로 단계 열기 가능.",
+  "stage_unlock_policy": {
+    "age6": {
+      "kind": "default_unlocked"
+    },
+    "age7": {
+      "kind": "previous_stage_completed",
+      "previous_stage_id": "age6",
+      "requires_all_collectibles": true,
+      "final_review_card_count": 20,
+      "final_review_completion_rule": "all_cards_eventually_correct"
+    },
+    "age8": {
+      "kind": "previous_stage_completed",
+      "previous_stage_id": "age7",
+      "requires_all_collectibles": true,
+      "final_review_card_count": 20,
+      "final_review_completion_rule": "all_cards_eventually_correct"
+    },
+    "never_relock_after_unlock": true,
+    "parent_override_enabled": true,
+    "all_collectibles_denominator": "stage_manifest_word_count_and_required_manifest_content (age6=155, age7=120, age8=120); freeze milestone version once completed",
+    "mastery_badge_separate_from_stage_completion": true,
+    "requires_all_manifest_content_publishable_for_final_review": true,
+    "stage_complete_never_revoke": true
+  },
+  "quiz_mixture_by_stage": {
+    "age6": {
+      "age6": 100
+    },
+    "age7": {
+      "age7": 70,
+      "age6": 30
+    },
+    "age8": {
+      "age8": 70,
+      "age7": 20,
+      "age6": 10
+    }
+  },
+  "stage_progress_tracking": {
+    "mission_target_card_count_choices": [
+      30,
+      50,
+      100
+    ],
+    "stage_collectibles_count_unique_words": true,
+    "already_collected_card_can_reappear_as_review": true,
+    "requeued_wrong_answers_do_not_increase_goal_denominator": true
+  },
+  "stages": [
+    {
+      "id": "age6",
+      "title_ko": "6세 · 첫 탐험섬",
+      "subtitle_ko": "그림으로 만나는 첫 영어 친구들",
+      "theme": "forest_and_basics",
+      "visual_icon": "🌳",
+      "word_count": 155,
+      "zones": [
+        {
+          "id": "age6-animals",
+          "title_ko": "동물의 숲",
+          "word_count": 22,
+          "unlock": {
+            "kind": "stage_available"
+          },
+          "map_position": {
+            "x": 10,
+            "y": 27
+          }
+        },
+        {
+          "id": "age6-food",
+          "title_ko": "맛있는 마을",
+          "word_count": 22,
+          "unlock": {
+            "kind": "stage_available"
+          },
+          "map_position": {
+            "x": 30,
+            "y": 27
+          }
+        },
+        {
+          "id": "age6-things",
+          "title_ko": "장난감 마을",
+          "word_count": 19,
+          "unlock": {
+            "kind": "stage_available"
+          },
+          "map_position": {
+            "x": 50,
+            "y": 27
+          }
+        },
+        {
+          "id": "age6-body",
+          "title_ko": "우리 몸 연구소",
+          "word_count": 14,
+          "unlock": {
+            "kind": "stage_available"
+          },
+          "map_position": {
+            "x": 70,
+            "y": 27
+          }
+        },
+        {
+          "id": "age6-colors",
+          "title_ko": "무지개 언덕",
+          "word_count": 12,
+          "unlock": {
+            "kind": "stage_available"
+          },
+          "map_position": {
+            "x": 90,
+            "y": 27
+          }
+        },
+        {
+          "id": "age6-numbers",
+          "title_ko": "숫자 별나라",
+          "word_count": 10,
+          "unlock": {
+            "kind": "stage_available"
+          },
+          "map_position": {
+            "x": 10,
+            "y": 73
+          }
+        },
+        {
+          "id": "age6-nature",
+          "title_ko": "반짝 자연섬",
+          "word_count": 15,
+          "unlock": {
+            "kind": "stage_available"
+          },
+          "map_position": {
+            "x": 30,
+            "y": 73
+          }
+        },
+        {
+          "id": "age6-home",
+          "title_ko": "생활 마을",
+          "word_count": 17,
+          "unlock": {
+            "kind": "stage_available"
+          },
+          "map_position": {
+            "x": 50,
+            "y": 73
+          }
+        },
+        {
+          "id": "age6-actions",
+          "title_ko": "움직임 놀이터",
+          "word_count": 12,
+          "unlock": {
+            "kind": "stage_available"
+          },
+          "map_position": {
+            "x": 70,
+            "y": 73
+          }
+        },
+        {
+          "id": "age6-feelings",
+          "title_ko": "표정과 크기 광장",
+          "word_count": 12,
+          "unlock": {
+            "kind": "stage_available"
+          },
+          "map_position": {
+            "x": 90,
+            "y": 73
+          }
+        }
+      ],
+      "zone_unlock_strategy": "all_available"
+    },
+    {
+      "id": "age7",
+      "title_ko": "7세 · 신나는 모험 마을",
+      "subtitle_ko": "집 밖으로 탐험하며 새로운 단어 수집",
+      "theme": "adventure_town",
+      "visual_icon": "🏘️",
+      "word_count": 120,
+      "zone_unlock_strategy": "next_zone_at_80_percent_collected_of_previous_zone",
+      "zones": [
+        {
+          "id": "age7-school",
+          "title_ko": "학교 탐험 마을",
+          "visual_icon": "🏫",
+          "word_count": 20,
+          "order": 1,
+          "unlock": {
+            "kind": "stage_available"
+          },
+          "map_position": {
+            "x": 12,
+            "y": 24
+          }
+        },
+        {
+          "id": "age7-home",
+          "title_ko": "아늑한 집",
+          "visual_icon": "🏡",
+          "word_count": 20,
+          "order": 2,
+          "unlock": {
+            "kind": "prior_zone_collection_ratio",
+            "threshold": 0.8
+          },
+          "map_position": {
+            "x": 42,
+            "y": 16
+          }
+        },
+        {
+          "id": "age7-market",
+          "title_ko": "맛있는 시장",
+          "visual_icon": "🥦",
+          "word_count": 20,
+          "order": 3,
+          "unlock": {
+            "kind": "prior_zone_collection_ratio",
+            "threshold": 0.8
+          },
+          "map_position": {
+            "x": 72,
+            "y": 29
+          }
+        },
+        {
+          "id": "age7-wildlife",
+          "title_ko": "바다와 야생의 숲",
+          "visual_icon": "🐬",
+          "word_count": 20,
+          "order": 4,
+          "unlock": {
+            "kind": "prior_zone_collection_ratio",
+            "threshold": 0.8
+          },
+          "map_position": {
+            "x": 72,
+            "y": 65
+          }
+        },
+        {
+          "id": "age7-town",
+          "title_ko": "바퀴와 도시",
+          "visual_icon": "🚌",
+          "word_count": 20,
+          "order": 5,
+          "unlock": {
+            "kind": "prior_zone_collection_ratio",
+            "threshold": 0.8
+          },
+          "map_position": {
+            "x": 42,
+            "y": 78
+          }
+        },
+        {
+          "id": "age7-shape_numbers",
+          "title_ko": "도형·숫자 언덕",
+          "visual_icon": "🔷",
+          "word_count": 20,
+          "order": 6,
+          "unlock": {
+            "kind": "prior_zone_collection_ratio",
+            "threshold": 0.8
+          },
+          "map_position": {
+            "x": 12,
+            "y": 63
+          }
+        }
+      ]
+    },
+    {
+      "id": "age8",
+      "title_ko": "8세 · 별빛 대탐험",
+      "subtitle_ko": "직업·자연·행동·별나라까지 펼쳐지는 큰 세상",
+      "theme": "starlight_expedition",
+      "visual_icon": "🚀",
+      "word_count": 120,
+      "zone_unlock_strategy": "next_zone_at_80_percent_collected_of_previous_zone",
+      "zones": [
+        {
+          "id": "age8-jobs",
+          "title_ko": "꿈꾸는 직업 거리",
+          "visual_icon": "🧑‍🚀",
+          "word_count": 20,
+          "order": 1,
+          "unlock": {
+            "kind": "stage_available"
+          },
+          "map_position": {
+            "x": 10,
+            "y": 70
+          }
+        },
+        {
+          "id": "age8-places",
+          "title_ko": "커다란 도시",
+          "visual_icon": "🏙️",
+          "word_count": 20,
+          "order": 2,
+          "unlock": {
+            "kind": "prior_zone_collection_ratio",
+            "threshold": 0.8
+          },
+          "map_position": {
+            "x": 40,
+            "y": 82
+          }
+        },
+        {
+          "id": "age8-weather",
+          "title_ko": "날씨·자연 모험",
+          "visual_icon": "🌋",
+          "word_count": 20,
+          "order": 3,
+          "unlock": {
+            "kind": "prior_zone_collection_ratio",
+            "threshold": 0.8
+          },
+          "map_position": {
+            "x": 70,
+            "y": 66
+          }
+        },
+        {
+          "id": "age8-routines",
+          "title_ko": "움직임 연구소",
+          "visual_icon": "🏃",
+          "word_count": 20,
+          "order": 4,
+          "unlock": {
+            "kind": "prior_zone_collection_ratio",
+            "threshold": 0.8
+          },
+          "map_position": {
+            "x": 70,
+            "y": 26
+          }
+        },
+        {
+          "id": "age8-sports_music",
+          "title_ko": "운동과 음악 축제",
+          "visual_icon": "🎻",
+          "word_count": 20,
+          "order": 5,
+          "unlock": {
+            "kind": "prior_zone_collection_ratio",
+            "threshold": 0.8
+          },
+          "map_position": {
+            "x": 40,
+            "y": 13
+          }
+        },
+        {
+          "id": "age8-space",
+          "title_ko": "별빛 우주기지",
+          "visual_icon": "🚀",
+          "word_count": 20,
+          "order": 6,
+          "unlock": {
+            "kind": "prior_zone_collection_ratio",
+            "threshold": 0.8
+          },
+          "map_position": {
+            "x": 10,
+            "y": 29
+          }
+        }
+      ]
+    }
+  ],
+  "content_reference_urls": [
+    "https://www.cambridgeenglish.org/exams-and-tests/qualifications/young-learners/paper/starters/preparation/",
+    "https://www.cambridgeenglish.org/exams-and-tests/qualifications/young-learners/paper/movers/preparation/",
+    "https://learnenglishkids.britishcouncil.org/grammar-vocabulary/word-games",
+    "https://www.britishcouncilfoundation.id/en/english/articles/start-teaching-kids-at-home"
+  ]
+}

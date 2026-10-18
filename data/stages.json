@@ -1,0 +1,304 @@
+{
+ "version": "0.2.0",
+ "unlock": {
+  "age6": {
+   "kind": "default_unlocked"
+  },
+  "age7": {
+   "kind": "previous_stage_completed",
+   "previous_stage_id": "age6",
+   "requires_all_collectibles": true,
+   "final_review_card_count": 20,
+   "final_review_completion_rule": "all_cards_eventually_correct"
+  },
+  "age8": {
+   "kind": "previous_stage_completed",
+   "previous_stage_id": "age7",
+   "requires_all_collectibles": true,
+   "final_review_card_count": 20,
+   "final_review_completion_rule": "all_cards_eventually_correct"
+  },
+  "never_relock_after_unlock": true,
+  "parent_override_enabled": true,
+  "all_collectibles_denominator": "stage_manifest_word_count_and_required_manifest_content (age6=155, age7=120, age8=120); freeze milestone version once completed",
+  "mastery_badge_separate_from_stage_completion": true,
+  "requires_all_manifest_content_publishable_for_final_review": true,
+  "stage_complete_never_revoke": true
+ },
+ "mix": {
+  "age6": {
+   "age6": 100
+  },
+  "age7": {
+   "age7": 70,
+   "age6": 30
+  },
+  "age8": {
+   "age8": 70,
+   "age7": 20,
+   "age6": 10
+  }
+ },
+ "stages": [
+  {
+   "id": "age6",
+   "title": "6세 · 첫 탐험섬",
+   "short": "첫 탐험섬",
+   "subtitle": "그림으로 만나는 첫 영어 친구들",
+   "color": "#0F6B5F",
+   "count": 155,
+   "zones": [
+    {
+     "id": "age6-animals",
+     "title": "동물의 숲",
+     "color": "#6DB54A",
+     "order": 1,
+     "unlock": {
+      "kind": "stage_available"
+     },
+     "count": 22
+    },
+    {
+     "id": "age6-food",
+     "title": "맛있는 마을",
+     "color": "#EE8A3A",
+     "order": 2,
+     "unlock": {
+      "kind": "stage_available"
+     },
+     "count": 22
+    },
+    {
+     "id": "age6-things",
+     "title": "장난감 마을",
+     "color": "#4F86E8",
+     "order": 3,
+     "unlock": {
+      "kind": "stage_available"
+     },
+     "count": 19
+    },
+    {
+     "id": "age6-body",
+     "title": "우리 몸 연구소",
+     "color": "#E4789F",
+     "order": 4,
+     "unlock": {
+      "kind": "stage_available"
+     },
+     "count": 14
+    },
+    {
+     "id": "age6-colors",
+     "title": "무지개 언덕",
+     "color": "#B05FD0",
+     "order": 5,
+     "unlock": {
+      "kind": "stage_available"
+     },
+     "count": 12
+    },
+    {
+     "id": "age6-numbers",
+     "title": "숫자 별나라",
+     "color": "#C9A227",
+     "order": 6,
+     "unlock": {
+      "kind": "stage_available"
+     },
+     "count": 10
+    },
+    {
+     "id": "age6-nature",
+     "title": "반짝 자연섬",
+     "color": "#2E9C8A",
+     "order": 7,
+     "unlock": {
+      "kind": "stage_available"
+     },
+     "count": 15
+    },
+    {
+     "id": "age6-home",
+     "title": "생활 마을",
+     "color": "#8E7BE0",
+     "order": 8,
+     "unlock": {
+      "kind": "stage_available"
+     },
+     "count": 17
+    },
+    {
+     "id": "age6-actions",
+     "title": "움직임 놀이터",
+     "color": "#E2533F",
+     "order": 9,
+     "unlock": {
+      "kind": "stage_available"
+     },
+     "count": 12
+    },
+    {
+     "id": "age6-feelings",
+     "title": "표정과 크기 광장",
+     "color": "#F0A21B",
+     "order": 10,
+     "unlock": {
+      "kind": "stage_available"
+     },
+     "count": 12
+    }
+   ]
+  },
+  {
+   "id": "age7",
+   "title": "7세 · 신나는 모험 마을",
+   "short": "신나는 모험 마을",
+   "subtitle": "집 밖으로 탐험하며 새로운 단어 수집",
+   "color": "#D5372A",
+   "count": 120,
+   "zones": [
+    {
+     "id": "age7-school",
+     "title": "학교 탐험 마을",
+     "color": "#3E7FD6",
+     "order": 1,
+     "unlock": {
+      "kind": "stage_available"
+     },
+     "count": 20
+    },
+    {
+     "id": "age7-home",
+     "title": "아늑한 집",
+     "color": "#B9845A",
+     "order": 2,
+     "unlock": {
+      "kind": "prior_zone_collection_ratio",
+      "threshold": 0.8
+     },
+     "count": 20
+    },
+    {
+     "id": "age7-market",
+     "title": "맛있는 시장",
+     "color": "#5FAE3E",
+     "order": 3,
+     "unlock": {
+      "kind": "prior_zone_collection_ratio",
+      "threshold": 0.8
+     },
+     "count": 20
+    },
+    {
+     "id": "age7-wildlife",
+     "title": "바다와 야생의 숲",
+     "color": "#1F9BB5",
+     "order": 4,
+     "unlock": {
+      "kind": "prior_zone_collection_ratio",
+      "threshold": 0.8
+     },
+     "count": 20
+    },
+    {
+     "id": "age7-town",
+     "title": "바퀴와 도시",
+     "color": "#D9573B",
+     "order": 5,
+     "unlock": {
+      "kind": "prior_zone_collection_ratio",
+      "threshold": 0.8
+     },
+     "count": 20
+    },
+    {
+     "id": "age7-shape_numbers",
+     "title": "도형·숫자 언덕",
+     "color": "#9C6AD6",
+     "order": 6,
+     "unlock": {
+      "kind": "prior_zone_collection_ratio",
+      "threshold": 0.8
+     },
+     "count": 20
+    }
+   ]
+  },
+  {
+   "id": "age8",
+   "title": "8세 · 별빛 대탐험",
+   "short": "별빛 대탐험",
+   "subtitle": "직업·자연·행동·별나라까지 펼쳐지는 큰 세상",
+   "color": "#34306E",
+   "count": 120,
+   "zones": [
+    {
+     "id": "age8-jobs",
+     "title": "꿈꾸는 직업 거리",
+     "color": "#2F6FB0",
+     "order": 1,
+     "unlock": {
+      "kind": "stage_available"
+     },
+     "count": 20
+    },
+    {
+     "id": "age8-places",
+     "title": "커다란 도시",
+     "color": "#7A6CD9",
+     "order": 2,
+     "unlock": {
+      "kind": "prior_zone_collection_ratio",
+      "threshold": 0.8
+     },
+     "count": 20
+    },
+    {
+     "id": "age8-weather",
+     "title": "날씨·자연 모험",
+     "color": "#38A3C9",
+     "order": 3,
+     "unlock": {
+      "kind": "prior_zone_collection_ratio",
+      "threshold": 0.8
+     },
+     "count": 20
+    },
+    {
+     "id": "age8-routines",
+     "title": "움직임 연구소",
+     "color": "#E46A4A",
+     "order": 4,
+     "unlock": {
+      "kind": "prior_zone_collection_ratio",
+      "threshold": 0.8
+     },
+     "count": 20
+    },
+    {
+     "id": "age8-sports_music",
+     "title": "운동과 음악 축제",
+     "color": "#E0A021",
+     "order": 5,
+     "unlock": {
+      "kind": "prior_zone_collection_ratio",
+      "threshold": 0.8
+     },
+     "count": 20
+    },
+    {
+     "id": "age8-space",
+     "title": "별빛 우주기지",
+     "color": "#34306E",
+     "order": 6,
+     "unlock": {
+      "kind": "prior_zone_collection_ratio",
+      "threshold": 0.8
+     },
+     "count": 20
+    }
+   ]
+  }
+ ]
+}

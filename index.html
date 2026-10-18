@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="헬로 아일랜드">
+<meta name="theme-color" content="#D5372A">
+<meta name="description" content="그림을 보고 영어 소리를 들어 단어 친구 395명을 도감에 모으는 아이패드용 영어 듣기 탐험 게임.">
+<title>헬로 아일랜드</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/ui/icon-192.png">
+<link rel="apple-touch-icon" href="assets/ui/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Andika:wght@400;700&family=Black+Han+Sans&family=IBM+Plex+Mono:wght@500;600;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<!-- 확대·복사 잠금은 다른 무엇보다 먼저 -->
+<script src="js/lock.js"></script>
+</head>
+<body>
+
+<header id="masthead">
+  <span class="mast-lens" aria-hidden="true"><i></i></span>
+  <h1 class="mast-title" id="mast-title">헬로 아일랜드</h1>
+  <button class="mast-btn" id="btn-sound" type="button">소리 끄기</button>
+  <button class="mast-btn" id="btn-parent" type="button">보호자</button>
+  <button class="mast-btn is-hidden" id="btn-pause" type="button">잠시 쉬기</button>
+  <button class="mast-btn is-hidden" id="btn-home" type="button">처음으로</button>
+</header>
+
+<main id="screens">
+  <section class="screen" id="screen-home"><div class="scroll" id="home-body"></div></section>
+  <section class="screen" id="screen-intro"></section>
+  <section class="screen" id="screen-quiz"></section>
+  <section class="screen" id="screen-dex"></section>
+  <section class="screen" id="screen-map"><div class="scroll" id="map-body"></div></section>
+  <section class="screen" id="screen-parent"><div class="scroll" id="parent-body"></div></section>
+
+  <div class="overlay" id="overlay"><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
+  <button class="sound-gate is-hidden" id="sound-gate" type="button">눌러서 소리 켜기</button>
+  <div class="booting" id="booting">지도를 펴고 있어요</div>
+</main>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
