@@ -161,7 +161,7 @@ export function summarize(s) {
     retries: s.retries,
     hints: s.hints,
     found: s.found.length,
-    speakDone: s.speakDone || 0, // 두 번 따라 녹음한 문장 수
+    speakDone: s.speakDone || 0, // 따라 녹음한 문장 수
     finishedAt: Date.now(),
   };
 }

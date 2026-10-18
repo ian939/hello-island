@@ -44,6 +44,9 @@ let sfxGain = null;
 const warmed = new Set();
 
 export const audioState = { onBlocked: null, onSpeaking: null };
+let beforeUnlock = null;
+/** 터치마다 먼저 할 일 (녹음 뒤 통화 모드 풀기) */
+export const setBeforeUnlock = (fn) => (beforeUnlock = fn);
 
 function el() {
   if (!voice) {
@@ -56,6 +59,7 @@ function el() {
 
 /** 터치 이벤트 안에서 부른다 — <audio> 와 효과음을 깨운다 */
 export function unlock() {
+  if (beforeUnlock) beforeUnlock();
   const v = el();
   if (!unlocked) {
     if (!SILENT) SILENT = silentWav();

@@ -8,6 +8,7 @@ import * as audio from './audio.js';
 import { artEl } from './art.js';
 import { $, el, button, tint, openSheet, closeSheet, toast, earIcon } from './ui.js';
 import { startSession, startGate, resumeSession } from './quiz.js';
+import { restorePlayback } from './speak.js';
 import { openParent } from './parent.js';
 
 const EMBLEM = { age6: 'assets/ui/island.webp', age7: 'assets/ui/town.webp', age8: 'assets/ui/space.webp' };
@@ -442,6 +443,7 @@ async function boot() {
   });
   // 어디든 처음 누를 때 소리를 깨워 둔다
   // 터치마다 소리를 깨운다 — 녹음 뒤 작아진 소리도 다음 터치에서 새 엔진으로 되돌아온다
+  audio.setBeforeUnlock(restorePlayback);
   window.addEventListener('pointerdown', () => audio.unlock(), { capture: true });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) audio.stop();

@@ -93,7 +93,7 @@ function renderParent() {
     stat(String(week.reduce((a, h) => a + h.retries, 0)), '최근 7일 재도전 횟수'),
     stat(String(week.reduce((a, h) => a + h.hints, 0)), '최근 7일 도움 듣기'),
     stat(String(week.length), '최근 7일 마친 탐험'),
-    stat(String(sd), '최근 7일 두 번 따라 녹음한 문장'),
+    stat(String(sd), '최근 7일 따라 녹음한 문장'),
     stat(`${found}`, `발견한 단어 (${ids.length}개 중)`),
     stat(`${friends}`, '친해진 단어 (다른 날 2회+)'),
     stat(`${mastered}`, '숙련 단어 (다른 날 3회+)'),
@@ -133,7 +133,7 @@ function renderParent() {
     setting('보기를 누를 때 발음', '느리게 = 0.65배 속도', seg([[false, '보통'], [true, '느리게']], state.settings.slow, (v) => save((st) => (st.settings.slow = v)))),
     setting(
       '따라 녹음하기',
-      '정답 문장을 두 번 따라 녹음하고 내 목소리 듣기 (점수 없음, 녹음은 기기 밖으로 나가지 않음) · 끄면 3초 뒤 다음',
+      '정답 문장을 한 번 따라 녹음하고 내 목소리 듣기 (점수 없음, 녹음은 기기 밖으로 나가지 않음) · 끄면 3초 뒤 다음. iPad 소리가 작아지면 끄세요',
       seg([[true, '켬'], [false, '끔']], state.settings.speak !== false, (v) => save((st) => (st.settings.speak = v))),
     ),
     setting('움직임 줄이기', '그림이 계속 움직이지 않게', seg([[false, '끔'], [true, '켬']], state.settings.calm, (v) => {
