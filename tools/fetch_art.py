@@ -16,6 +16,7 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'tools'))
 from curation import ART  # noqa: E402
+from words_source import all_words  # noqa: E402
 
 OUT = ROOT / 'assets' / 'art'
 RAW = 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/'
@@ -37,7 +38,7 @@ def fluent_index():
 
 
 def main():
-    words = json.loads((ROOT / 'tools' / 'seed' / 'vocabulary.seed.json').read_text(encoding='utf-8'))['words']
+    words = all_words()
     index = fluent_index()
     OUT.mkdir(parents=True, exist_ok=True)
     jobs = []

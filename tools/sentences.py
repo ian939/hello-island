@@ -417,3 +417,9 @@ for _n in range(1, 21):
         f"I have {N_EN[_n]} {'apple' if _n == 1 else 'apples'}.",
         f'나는 사과가 {N_KO[_n]} 개 있어요.',
     )
+
+# 6세 추가 단어의 문장
+from extra_words import EXTRA  # noqa: E402
+
+for _w in EXTRA:
+    SENTENCES[_w[1]] = (_w[5], _w[6])

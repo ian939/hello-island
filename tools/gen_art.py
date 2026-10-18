@@ -20,6 +20,7 @@ from scipy import ndimage
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'tools'))
 from curation import ART  # noqa: E402
+from words_source import all_words  # noqa: E402
 
 GEN = Path.home() / '.claude' / 'skills' / 'codex-imagegen' / 'scripts' / 'gen_image.py'
 SHEETS = ROOT / 'tools' / 'sheets'
@@ -43,7 +44,7 @@ def art_key(word):
 
 
 def todo():
-    words = json.loads((ROOT / 'tools' / 'seed' / 'vocabulary.seed.json').read_text(encoding='utf-8'))['words']
+    words = all_words()
     items = [(w['id'], ART[art_key(w)][2:]) for w in words if ART[art_key(w)].startswith('G:')]
     return [items[i:i + PER] for i in range(0, len(items), PER)]
 

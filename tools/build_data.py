@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'tools'))
 from curation import ART, CONFUSE, NUMBER_GAP  # noqa: E402
 from sentences import SENTENCES  # noqa: E402
+from words_source import all_words  # noqa: E402
 
 SEED = ROOT / 'tools' / 'seed'
 
@@ -82,7 +83,10 @@ def motion(w):
 def main():
     seed = json.loads((SEED / 'vocabulary.seed.json').read_text(encoding='utf-8'))
     stages_seed = json.loads((SEED / 'stages.seed.json').read_text(encoding='utf-8'))
-    words = seed['words']
+    # 6세 추가 단어는 자기 구역 끝에 오도록 정렬한다 (도감 번호가 구역별로 이어지게).
+    zone_order = [z['id'] for st in stages_seed['stages'] for z in st['zones']]
+    words = sorted(enumerate(all_words()), key=lambda t: (zone_order.index(t[1]['zone_id']), t[0]))
+    words = [w for _, w in words]
 
     keys = {art_key(w) for w in words}
     missing = (keys - set(ART)) | (keys - set(SENTENCES))
@@ -140,7 +144,7 @@ def main():
             'short': STAGE_SHORT[st['id']],
             'subtitle': st['subtitle_ko'],
             'color': STAGE_COLOR[st['id']],
-            'count': st['word_count'],
+            'count': sum(1 for w in out if w['stage'] == st['id']),
             'zones': zones,
         })
 

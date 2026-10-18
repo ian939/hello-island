@@ -86,13 +86,16 @@ function renderParent() {
   const found = ids.filter((id) => state.words[id] && state.words[id].discoveredAt).length;
   const friends = ids.filter((id) => level(state.words[id]) >= 2).length;
   const mastered = ids.filter((id) => isMastered(state.words[id])).length;
+  const sc = week.reduce((a, h) => a + (h.speakCards || 0), 0);
+  const sp = week.reduce((a, h) => a + (h.speakPass || 0), 0);
   const stats = el('div', 'stats');
   stats.append(
     stat(ft ? `${Math.round((fr / ft) * 100)}%` : '–', `최근 7일 첫 시도 정답률 (${fr}/${ft})`),
     stat(String(week.reduce((a, h) => a + h.retries, 0)), '최근 7일 재도전 횟수'),
     stat(String(week.reduce((a, h) => a + h.hints, 0)), '최근 7일 도움 듣기'),
     stat(String(week.length), '최근 7일 마친 탐험'),
-    stat(`${found}`, '발견한 단어 (395개 중)'),
+    stat(sc ? `${Math.round((sp / sc) * 100)}%` : '–', `최근 7일 따라 말하기 70% 넘긴 문장 (${sp}/${sc})`),
+    stat(`${found}`, `발견한 단어 (${ids.length}개 중)`),
     stat(`${friends}`, '친해진 단어 (다른 날 2회+)'),
     stat(`${mastered}`, '숙련 단어 (다른 날 3회+)'),
   );
@@ -129,6 +132,11 @@ function renderParent() {
   wrap.append(
     setting('보기 개수', '익숙해지면 4개로', seg([[3, '3개'], [4, '4개']], state.settings.choices, (v) => save((st) => (st.settings.choices = v)))),
     setting('보기를 누를 때 발음', '느리게 = 0.65배 속도', seg([[false, '보통'], [true, '느리게']], state.settings.slow, (v) => save((st) => (st.settings.slow = v)))),
+    setting(
+      '따라 말하기',
+      '정답 문장을 말하고 내 목소리 듣기 · 70% 넘으면 통과, 3번 안 되면 그냥 넘어감 · 인터넷 필요 (Safari 음성 인식은 Apple 서버에서 처리)',
+      seg([[true, '켬'], [false, '끔']], state.settings.speak !== false, (v) => save((st) => (st.settings.speak = v))),
+    ),
     setting('움직임 줄이기', '그림이 계속 움직이지 않게', seg([[false, '끔'], [true, '켬']], state.settings.calm, (v) => {
       save((st) => (st.settings.calm = v));
       document.body.classList.toggle('is-calm', v);

@@ -319,3 +319,10 @@ CONFUSE = [
 NUMBER_GAP = {'age6': 1, 'age7': 2}
 
 # 정답 뒤 팝업 문장과 한글 해석은 tools/sentences.py
+
+# 6세 추가 단어(구역마다 30개 채우기)의 그림과 헷갈림 묶음
+from extra_words import EXTRA, EXTRA_CONFUSE  # noqa: E402
+
+for _w in EXTRA:
+    ART[_w[1]] = _w[4]
+CONFUSE += EXTRA_CONFUSE

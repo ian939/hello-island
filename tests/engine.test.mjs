@@ -35,16 +35,19 @@ function newDaily(content, st, zoneId = null, seed = 1, today = '2026-10-18') {
 
 const T = '2026-10-18';
 
-test('데이터: 395단어 · 155/120/120 · 7/8세 구역마다 20개', () => {
+test('데이터: 502단어 · 262/120/120 · 6세 구역 30개(색 12·숫자 10) · 7/8세 구역 20개', () => {
   const c = allReady();
-  assert.equal(c.list.length, 395);
-  assert.deepEqual([c.byStage.age6.length, c.byStage.age7.length, c.byStage.age8.length], [155, 120, 120]);
+  assert.equal(c.list.length, 502);
+  assert.deepEqual([c.byStage.age6.length, c.byStage.age7.length, c.byStage.age8.length], [262, 120, 120]);
+  for (const z of c.stages[0].zones) assert.equal(c.byZone[z.id].length, { 'age6-colors': 12, 'age6-numbers': 10 }[z.id] || 30, z.id);
+  // 기획 seed 의 155개 ID 는 그대로
+  assert.ok(['animals-cat', 'feelings-close', 'numbers-ten'].every((id) => c.words[id]));
   for (const s of c.stages.filter((s) => s.id !== 'age6')) for (const z of s.zones) assert.equal(c.byZone[z.id].length, 20, z.id);
   assert.equal(Object.keys(c.zones).length, 22);
-  assert.equal(new Set(c.list.map((w) => w.id)).size, 395);
+  assert.equal(new Set(c.list.map((w) => w.id)).size, 502);
 });
 
-test('한 판 = 서로 다른 단어: 섬 전체 30장, 동물의 숲은 22장 전부', () => {
+test('한 판 = 서로 다른 단어: 섬 전체 30장, 동물의 숲은 30장 전부', () => {
   const c = allReady();
   const st = fresh(c);
   const { s } = newDaily(c, st);
@@ -56,8 +59,11 @@ test('한 판 = 서로 다른 단어: 섬 전체 30장, 동물의 숲은 22장 �
   const st2 = fresh(c);
   const z = newDaily(c, st2, 'age6-animals').s;
   const zw = z.order.map((id) => z.cards[id].word);
-  assert.equal(zw.length, 22);
-  assert.equal(new Set(zw).size, 22);
+  assert.equal(zw.length, 30);
+  assert.equal(new Set(zw).size, 30);
+  // 숫자 별나라는 10개 전부
+  const nz = newDaily(c, fresh(c), 'age6-numbers').s;
+  assert.equal(nz.order.length, 10);
   assert.ok(zw.every((id) => c.words[id].zone === 'age6-animals'));
 });
 
@@ -198,14 +204,14 @@ test('도감 최초 수집은 한 번만, 숙련은 서로 다른 날짜가 쌓�
   assert.equal(level(p), 3);
 });
 
-test('6세 154/155 → 잠김, 155/155 → 최종 미션만 준비, 미션 완료 → 7세 열림', () => {
+test('6세 하나 빼고 다 모음 → 잠김, 전부 → 최종 미션만 준비, 미션 완료 → 7세 열림', () => {
   const c = allReady();
   const st = fresh(c);
   const ids = c.byStage.age6;
-  ids.slice(0, 154).forEach((id) => recordCorrect(st, id, { attempts: 1, hints: 0 }, T));
+  ids.slice(0, -1).forEach((id) => recordCorrect(st, id, { attempts: 1, hints: 0 }, T));
   refreshUnlocks(c, st);
   assert.equal(st.map.gate.age6, 'locked');
-  recordCorrect(st, ids[154], { attempts: 1, hints: 0 }, T);
+  recordCorrect(st, ids[ids.length - 1], { attempts: 1, hints: 0 }, T);
   refreshUnlocks(c, st);
   assert.equal(st.map.gate.age6, 'ready');
   assert.ok(!st.map.unlockedStages.includes('age7'));
@@ -226,7 +232,7 @@ test('그림·음성이 빠진 단어가 있으면 다 모아도 최종 미션�
   c.byStage.age6.forEach((id) => recordCorrect(st, id, { attempts: 1, hints: 0 }, T));
   refreshUnlocks(c, st);
   assert.equal(st.map.gate.age6, 'locked');
-  assert.equal(stageTotals(c, st, 'age6').ready, 154);
+  assert.equal(stageTotals(c, st, 'age6').ready, c.byStage.age6.length - 1);
 });
 
 test('7세 구역: 15/20 → 다음 구역 잠김, 16/20 → 열림, 한 번 열리면 다시 잠기지 않음', () => {
@@ -296,4 +302,17 @@ test('저장 상태: 저장→복원 후 남은 카드·오답 큐·수집 기�
   const old = migrate({ session: { order: [], cards: {} }, words: { 'animals-cat': { discoveredAt: T } } });
   assert.equal(old.session.stage, 'age6');
   assert.equal(old.words['animals-cat'].discoveredAt, T);
+});
+
+test('따라 말하기 점수: 순서대로 맞힌 낱말 비율, 숫자·축약형·대소문자 무시', async () => {
+  const { score, bestOf, PASS } = await import('../js/speak.js');
+  assert.equal(score('The cat says meow.', 'the cat says meow').ratio, 1);
+  assert.equal(score('The cat says meow.', 'cat says').ratio, 0.5);
+  assert.equal(score('I have three apples.', 'I have 3 apples').ratio, 1);
+  assert.equal(score("Let's eat!", 'lets eat').ratio, 1);
+  assert.equal(score('The cat says meow.', 'meow says cat the').ratio, 0.25); // 순서가 뒤죽박죽이면 낮게
+  const b = bestOf('The dog says woof.', ['the doc says', 'the dog says woof']);
+  assert.equal(b.ratio, 1);
+  assert.ok(score('The dog says woof.', 'the dog says').ratio >= PASS); // 4낱말 중 3개 = 75% 통과
+  assert.ok(score('The dog says woof.', 'the dog').ratio < PASS);
 });

@@ -1,5 +1,5 @@
 /* 오프라인 우선 — 앱 뼈대는 설치 때 받아 두고, 그림·소리는 쓰는 대로(또는 보호자 화면에서 한꺼번에) 캐시한다. */
-const SHELL = 'hello-island-shell-v2';
+const SHELL = 'hello-island-shell-v3';
 const ASSETS = 'hello-island-assets-v2';
 const FONTS = 'hello-island-fonts-v1';
 
@@ -16,6 +16,7 @@ const SHELL_FILES = [
   'js/art.js',
   'js/audio.js',
   'js/store.js',
+  'js/speak.js',
   'js/engine/content.js',
   'js/engine/map.js',
   'js/engine/plan.js',

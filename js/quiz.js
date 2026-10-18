@@ -11,6 +11,7 @@ import { $, el, button, tint, openSheet, closeSheet, toast, earIcon, checkIcon }
 import { planSession, planGate } from './engine/plan.js';
 import { createSession, currentCard, present, submit, useHint, advanceIntro, summarize } from './engine/session.js';
 import { refreshUnlocks, completeStage } from './engine/map.js';
+import * as speak from './speak.js';
 
 const RIGHT_SAY = ['딩동! 맞았어', '잘 들었어!', '바로 그거야!', '멋져!'];
 const NEW_SAY = '새 친구를 만났어!';
@@ -290,52 +291,190 @@ function renderQuiz() {
  * '다음'은 3초 동안 잠겨 있다 (막대가 차오르면 눌러서 넘어간다). */
 const SENTENCE_LOCK_MS = 3000;
 
+/* 문장을 낱말 칸으로 — 단어는 노랑, 따라 말하기 뒤에는 맞힌 낱말 초록 / 놓친 낱말 점선 */
 function sentenceLine(w) {
   const p = el('p', 'line-en');
-  const esc = w.en.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const m = new RegExp(`\\b${esc}\\w*`, 'i').exec(w.sentence);
-  if (!m) p.textContent = w.sentence;
-  else {
-    p.append(document.createTextNode(w.sentence.slice(0, m.index)), el('mark', null, m[0]), document.createTextNode(w.sentence.slice(m.index + m[0].length)));
-  }
+  const keys = speak.words(w.en);
+  const tokens = w.sentence.split(' ');
+  const map = []; // 비교용 낱말 번호 → 칸
+  tokens.forEach((tok, i) => {
+    const span = el('span', 'tok', tok);
+    const norm = speak.words(tok);
+    if (norm.some((n) => keys.some((k) => n.startsWith(k)))) span.classList.add('is-key');
+    norm.forEach(() => map.push(span));
+    p.append(span);
+    if (i < tokens.length - 1) p.append(document.createTextNode(' '));
+  });
+  p.paint = (hit) => {
+    map.forEach((span) => span.classList.remove('is-hit', 'is-miss'));
+    hit.forEach((ok, k) => {
+      const span = map[k];
+      if (!span) return;
+      // 낱말 하나가 둘로 나뉜 경우(yo-yo 등) 하나라도 놓치면 놓친 것으로
+      if (!ok) {
+        span.classList.remove('is-hit');
+        span.classList.add('is-miss');
+      } else if (!span.classList.contains('is-miss')) span.classList.add('is-hit');
+    });
+  };
   return p;
 }
 
+function micIcon() {
+  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  s.setAttribute('viewBox', '0 0 24 24');
+  s.setAttribute('aria-hidden', 'true');
+  s.innerHTML =
+    '<rect x="8" y="2.5" width="8" height="12" rx="4" fill="currentColor"/>' +
+    '<path d="M5 11a7 7 0 0 0 14 0M12 18v3.5M8.5 21.5h7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>';
+  return s;
+}
+
+/* 정답 뒤 문장 팝업
+ * 따라 말하기를 쓸 수 있으면: 말하기 → 내 목소리 한 번 듣기 → 70% 넘으면 '다음' (3번 안 되면 격려하고 '다음')
+ * 못 쓰면(마이크·인식·인터넷 없음, 보호자가 끔): 3초 뒤에 '다음' */
 function showSentence(w, next) {
+  const st = app.state;
+  const sess = st.session;
+  const practice = st.settings.speak !== false && speak.isAvailable();
   openSheet(
     (sh) => {
       sh.classList.add('sheet--line');
       const art = el('div', 'sheet-art');
-      art.appendChild(artEl(w, { motion: !app.state.settings.calm }));
+      art.appendChild(artEl(w, { motion: !st.settings.calm }));
+      const line = sentenceLine(w);
       const again = button('helper', null, () => playWith(again, audio.sentenceSrc(w.id)));
-      again.append(earIcon(), document.createTextNode('다시 듣기'));
+      again.append(earIcon(), document.createTextNode('문장 듣기'));
       const go = button('cta line-go', '다음 ▶');
       go.disabled = true;
-      const fill = el('b');
-      const bar = el('i', 'line-bar');
-      bar.appendChild(fill);
-      go.appendChild(bar);
       go.addEventListener('click', () => {
         if (go.disabled) return;
         audio.stop();
         closeSheet();
         next();
       });
-      sh.append(art, sentenceLine(w), el('p', 'line-ko', w.sentenceKo), again, go);
-      // 3초 뒤에 '다음'이 켜진다
-      fill.style.transitionDuration = `${SENTENCE_LOCK_MS}ms`;
-      setTimeout(() => {
-        fill.getBoundingClientRect(); // 0% 상태를 한 번 그린 뒤에 늘려야 차오르는 게 보인다
-        fill.style.width = '100%';
-      }, 30);
-      setTimeout(() => {
+      const ready = () => {
         go.disabled = false;
         go.classList.add('is-ready');
-      }, SENTENCE_LOCK_MS);
+      };
+      sh.append(art, line, el('p', 'line-ko', w.sentenceKo));
+
+      if (!practice) {
+        const fill = el('b');
+        const bar = el('i', 'line-bar');
+        bar.appendChild(fill);
+        go.appendChild(bar);
+        sh.append(again, go);
+        fill.style.transitionDuration = `${SENTENCE_LOCK_MS}ms`;
+        setTimeout(() => {
+          fill.getBoundingClientRect(); // 0% 상태를 한 번 그린 뒤에 늘려야 차오르는 게 보인다
+          fill.style.width = '100%';
+        }, 30);
+        setTimeout(ready, SENTENCE_LOCK_MS);
+        return;
+      }
+
+      // ----- 따라 말하기 -----
+      let tries = 0;
+      let listening = null;
+      let mineUrl = null;
+      let passed = false;
+
+      const box = el('div', 'speak');
+      const mic = button('mic');
+      const micLabel = el('span', null, '따라 말하기');
+      mic.append(micIcon(), micLabel);
+      const meter = el('div', 'speak-meter');
+      const meterFill = el('i');
+      const meterText = el('span', null, `${Math.round(speak.PASS * 100)}% 넘으면 통과`);
+      meter.append(meterFill, meterText);
+      const sayLine = el('p', 'speak-say', '문장을 듣고 똑같이 말해 봐!');
+      const mine = button('helper is-hidden', null, () => mineUrl && playWith(mine, mineUrl));
+      mine.append(earIcon(), document.createTextNode('내 목소리'));
+      const tools = el('div', 'helper-row');
+      tools.append(again, mine);
+      box.append(mic, sayLine, meter);
+      sh.append(tools, box, go);
+      sh.addEventListener('sheet-close', () => {
+        if (listening) listening.stop();
+        if (mineUrl) URL.revokeObjectURL(mineUrl);
+      }, { once: true });
+
+      mic.addEventListener('click', async () => {
+        if (listening) {
+          listening.stop();
+          return;
+        }
+        audio.stop();
+        audio.unlock();
+        tries += 1;
+        mic.classList.add('is-on');
+        micLabel.textContent = '다 말했어';
+        sayLine.textContent = '말해 봐! 다 말하면 버튼을 눌러';
+        listening = speak.listenOnce();
+        const res = await listening.done;
+        listening = null;
+        mic.classList.remove('is-on');
+        if (!document.body.contains(mic)) return; // 그새 창이 닫혔다
+        if (res.error) {
+          speak.markBlocked();
+          sayLine.textContent = '마이크를 쓸 수 없어서 이번엔 건너뛸게';
+          micLabel.textContent = '따라 말하기';
+          mic.disabled = true;
+          ready();
+          return;
+        }
+        const r = speak.bestOf(w.sentence, res.transcripts);
+        line.paint(r.hit);
+        const pct = Math.round(r.ratio * 100);
+        meterFill.style.width = `${pct}%`;
+        meterText.textContent = `${pct}%`;
+        meter.classList.toggle('is-pass', r.ratio >= speak.PASS);
+        if (mineUrl) URL.revokeObjectURL(mineUrl);
+        mineUrl = res.url;
+        if (mineUrl) mine.classList.remove('is-hidden');
+        recordSpeak(w.id, r.ratio, tries);
+
+        // 내 목소리를 한 번 들어 본 뒤에 결과
+        mic.disabled = true;
+        if (mineUrl) {
+          sayLine.textContent = '내 목소리를 들어 보자';
+          await playWith(mine, mineUrl);
+        }
+        mic.disabled = false;
+        if (r.ratio >= speak.PASS) {
+          audio.sfx('star');
+          sayLine.textContent = `잘했어! ${pct}% 따라 말했어`;
+          micLabel.textContent = '한 번 더 말하기';
+          if (!passed && sess) sess.speakPass = (sess.speakPass || 0) + 1;
+          passed = true;
+          ready();
+        } else if (tries < speak.MAX_TRIES && !passed) {
+          sayLine.textContent = `조금만 더! 문장을 다시 듣고 말해 봐 (${tries}/${speak.MAX_TRIES})`;
+          micLabel.textContent = '다시 말하기';
+        } else {
+          if (!passed) sayLine.textContent = '잘했어! 다음에 또 해 보자';
+          micLabel.textContent = '한 번 더 말하기';
+          ready();
+        }
+        app.save();
+      });
     },
     { dismissable: false },
   );
   audio.play(audio.sentenceSrc(w.id));
+}
+
+/* 따라 말하기 기록 (보호자 화면용) */
+function recordSpeak(id, ratio, tries) {
+  const st = app.state;
+  const p = st.words[id];
+  if (p) p.speakBest = Math.max(p.speakBest || 0, Math.round(ratio * 100));
+  const s = st.session;
+  if (s) {
+    s.speakTries = (s.speakTries || 0) + 1;
+    if (tries === 1) s.speakCards = (s.speakCards || 0) + 1;
+  }
 }
 
 /* ---------- 10장마다 쉬어 가기 ---------- */

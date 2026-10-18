@@ -71,6 +71,7 @@ export function openSheet(build, { wide = false, dismissable = true, close } = {
 
 export function closeSheet() {
   $('#overlay').classList.remove('is-on');
+  $('#sheet').dispatchEvent(new Event('sheet-close'));
   $('#sheet').replaceChildren();
   const fn = onClose;
   onClose = null;

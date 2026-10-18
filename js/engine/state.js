@@ -11,6 +11,7 @@ export function blankState() {
       slow: false, // 느린 발음을 기본으로
       muted: false,
       calm: false, // 움직임 줄이기
+      speak: true, // 정답 문장 따라 말하기 (마이크·인터넷이 될 때만)
     },
     map: blankMap(),
     words: {}, // wordId → progress

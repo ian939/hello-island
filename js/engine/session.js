@@ -161,6 +161,9 @@ export function summarize(s) {
     retries: s.retries,
     hints: s.hints,
     found: s.found.length,
+    speakCards: s.speakCards || 0, // 따라 말하기를 해 본 카드
+    speakPass: s.speakPass || 0, // 그중 70% 넘긴 카드
+    speakTries: s.speakTries || 0,
     finishedAt: Date.now(),
   };
 }
