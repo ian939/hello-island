@@ -69,12 +69,85 @@ export function recordOnce() {
         stream = s;
         recorder = new MediaRecorder(s);
         recorder.ondataavailable = (e) => e.data && e.data.size && chunks.push(e.data);
-        recorder.onstop = () =>
-          finish(chunks.length ? URL.createObjectURL(new Blob(chunks, { type: recorder.mimeType || 'audio/mp4' })) : null);
+        recorder.onstop = async () => {
+          if (!chunks.length) return finish(null);
+          const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/mp4' });
+          finish(await louder(blob));
+        };
         recorder.start();
         timer = setTimeout(stopNow, MAX_MS);
       })
       .catch((err) => finish(null, err && err.name === 'NotAllowedError' ? 'not-allowed' : 'audio-capture'));
   });
   return { stop: () => stopNow(), done };
+}
+
+/* ---------- 녹음한 목소리 키우기 ----------
+ * iPad 소리가 작아지지 않게 마이크의 자동 음량(AGC)을 꺼서 원본 녹음은 아주 작다.
+ * 녹음이 끝나면 앞뒤 조용한 부분을 잘라 내고, 가장 큰 소리가 꽉 차도록 키워서(최대 20배)
+ * WAV 로 다시 만든다. 소리를 내지 않는 계산 전용(OfflineAudioContext)이라 iPad 오디오 모드에 영향이 없다. */
+export async function louder(blob) {
+  const fallback = () => URL.createObjectURL(blob);
+  const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  if (!OAC) return fallback();
+  try {
+    const raw = await blob.arrayBuffer();
+    const decoder = new OAC(1, 1, 44100);
+    const buf = await new Promise((res, rej) => {
+      const p = decoder.decodeAudioData(raw, res, rej);
+      if (p && p.then) p.then(res, rej);
+    });
+    // 여러 채널이면 하나로 섞는다
+    const n = buf.length;
+    const data = new Float32Array(n);
+    for (let c = 0; c < buf.numberOfChannels; c += 1) {
+      const ch = buf.getChannelData(c);
+      for (let i = 0; i < n; i += 1) data[i] += ch[i] / buf.numberOfChannels;
+    }
+    // 아주 큰 순간 잡음(톡 소리)에 끌려가지 않게 상위 0.1% 값을 기준 최댓값으로
+    const mags = new Float32Array(Math.min(n, 48000));
+    const step = Math.max(1, Math.floor(n / mags.length));
+    for (let i = 0, k = 0; k < mags.length && i < n; i += step, k += 1) mags[k] = Math.abs(data[i]);
+    mags.sort();
+    const peak = Math.max(mags[Math.floor(mags.length * 0.999)] || 0, 1e-4);
+    const gain = Math.min(0.9 / peak, 20);
+    // 앞뒤 조용한 부분 자르기 (기준 최댓값의 8% 아래, 앞뒤로 0.15초 여유)
+    const gate = peak * 0.08;
+    let a = 0;
+    let b = n - 1;
+    while (a < n && Math.abs(data[a]) < gate) a += 1;
+    while (b > a && Math.abs(data[b]) < gate) b -= 1;
+    const pad = Math.floor(buf.sampleRate * 0.15);
+    a = Math.max(0, a - pad);
+    b = Math.min(n - 1, b + pad);
+    if (b - a < buf.sampleRate * 0.3) {
+      a = 0;
+      b = n - 1;
+    }
+    const out = new Float32Array(b - a + 1);
+    for (let i = 0; i < out.length; i += 1) out[i] = Math.tanh(data[a + i] * gain * 1.1); // 부드럽게 눌러 깨지지 않게
+    return URL.createObjectURL(wav(out, buf.sampleRate));
+  } catch (e) {
+    return fallback();
+  }
+}
+
+function wav(samples, rate) {
+  const len = samples.length;
+  const view = new DataView(new ArrayBuffer(44 + len * 2));
+  const str = (o, t) => [...t].forEach((c, i) => view.setUint8(o + i, c.charCodeAt(0)));
+  str(0, 'RIFF');
+  view.setUint32(4, 36 + len * 2, true);
+  str(8, 'WAVEfmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, rate, true);
+  view.setUint32(28, rate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  str(36, 'data');
+  view.setUint32(40, len * 2, true);
+  for (let i = 0; i < len; i += 1) view.setInt16(44 + i * 2, Math.max(-1, Math.min(1, samples[i])) * 0x7fff, true);
+  return new Blob([view], { type: 'audio/wav' });
 }
