@@ -341,7 +341,7 @@ async function cacheAll(btn) {
   const urls = new Set(['./', 'index.html', 'css/style.css', 'data/words.json', 'data/stages.json']);
   for (const w of content.list) {
     if (w.art.src) urls.add(w.art.src);
-    for (const d of ['w', 's', 'x']) urls.add(`assets/audio/${d}/${w.id}.mp3`);
+    for (const d of ['w', 's', 'x', 'xs']) urls.add(`assets/audio/${d}/${w.id}.mp3`);
   }
   for (const k of ['welcome', 'whats_this', 'listen_choose', 'meet', 'great', 'yes', 'nice', 'wow', 'new_friend', 'again', 'break', 'done', 'gate', 'portal']) urls.add(`assets/audio/ui/${k}.mp3`);
   const list = [...urls];

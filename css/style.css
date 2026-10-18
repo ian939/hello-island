@@ -865,3 +865,20 @@ body.is-calm [class^='mv-'], body.is-calm [class*=' mv-'] { animation: none !imp
 .speak-meter::after { content: ''; position: absolute; left: 70%; top: -3px; bottom: -3px; border-left: 3px dashed var(--ink); }
 .speak-meter span { position: relative; z-index: 1; display: block; line-height: 24px; font-family: var(--mono); font-size: 14px; font-weight: 700; }
 .speak-meter.is-pass span { color: var(--paper); }
+
+/* 낱말 아래 한글 읽기 */
+.line-en .tok { display: inline-flex; flex-direction: column; align-items: center; vertical-align: top; margin: 0 2px 6px; }
+.line-en .tok-ko {
+  margin-top: 4px;
+  font-family: var(--body); font-size: clamp(15px, 2.2vw, 19px); font-weight: 700; line-height: 1.1;
+  color: var(--ink-soft); letter-spacing: 0;
+}
+.line-en .tok.is-hit .tok-ko { color: var(--jade); }
+.line-read { margin: -8px 0 6px; font-size: 18px; font-weight: 700; color: var(--ink-soft); }
+/* 강조·맞힘·놓침 표시는 영어 줄에만 */
+.line-en .tok, .line-en .tok.is-key, .line-en .tok.is-hit, .line-en .tok.is-miss { padding: 0; background: none; border-bottom: 0; }
+.line-en .tok-en { padding: 0 2px; border-bottom: 3px solid transparent; }
+.line-en .tok.is-key .tok-en { padding: 0 6px; background: var(--marigold); border-bottom-color: var(--ink); }
+.line-en .tok.is-hit .tok-en { color: var(--jade); border-bottom-color: var(--jade); }
+.line-en .tok.is-key.is-hit .tok-en { color: var(--ink); background: #b9e3d7; border-bottom-color: var(--jade); }
+.line-en .tok.is-miss .tok-en { color: var(--ink-soft); border-bottom: 3px dashed var(--vermilion); }

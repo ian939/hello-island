@@ -403,13 +403,13 @@ function openDetail(id) {
     const zone = content.zones[w.zone];
     const line = el('p', 'line-en', w.sentence);
     line.style.fontSize = '24px';
-    sh.append(art, el('h2', 'detail-word', w.en), el('p', 'detail-meta', `No. ${pad(w.no)} · ${zone.title}`), el('span', 'detail-level', LEVEL_TEXT[lv]), line, el('p', 'line-ko', w.sentenceKo));
+    sh.append(art, el('h2', 'detail-word', w.en), el('p', 'detail-meta', `No. ${pad(w.no)} · ${zone.title}`), el('span', 'detail-level', LEVEL_TEXT[lv]), line, el('p', 'line-read', (w.sentenceRead || []).join(' ')), el('p', 'line-ko', w.sentenceKo));
     const row = el('div', 'detail-buttons');
     const listen = button('helper', null, () => app.sayWord(id, { slow: false }));
     listen.append(earIcon(), document.createTextNode('듣기'));
     const slow = button('helper', null, () => app.sayWord(id, { slow: true }));
     slow.append(earIcon(), document.createTextNode('천천히'));
-    const sent = button('helper', null, () => audio.play(audio.sentenceSrc(id)));
+    const sent = button('helper', null, () => audio.play(audio.sentenceSrc(id, true)));
     sent.append(earIcon(), document.createTextNode('문장'));
     row.append(listen, slow, sent);
     sh.append(row, button('btn', '닫기', closeSheet));

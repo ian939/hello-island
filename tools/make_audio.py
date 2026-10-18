@@ -3,6 +3,7 @@
   assets/audio/w/<id>.mp3   단어 (보통 빠르기)
   assets/audio/s/<id>.mp3   단어 (느리게)
   assets/audio/x/<id>.mp3   정답 뒤에 듣는 짧은 문장
+  assets/audio/xs/<id>.mp3  같은 문장 80% 속도 (문장 듣기 버튼)
   assets/audio/ui/<key>.mp3 안내·칭찬 문구
 
 이미 있는 파일은 건너뛴다. 문장을 고쳤다면 해당 파일을 지우고 다시 돌린다.
@@ -18,6 +19,7 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / 'assets' / 'audio'
 VOICE = 'en-US-AnaNeural'
 SLOW = '-35%'
+SENTENCE_SLOW = '-20%'  # 문장 듣기 = 80% 속도
 
 UI = {
     'welcome': 'Welcome to Hello Island!',
@@ -67,6 +69,8 @@ async def main():
         jobs.append(say(spoken(w), OUT / 'w' / f"{w['id']}.mp3", sem=sem))
         jobs.append(say(spoken(w), OUT / 's' / f"{w['id']}.mp3", rate=SLOW, sem=sem))
         jobs.append(say(w['sentence'], OUT / 'x' / f"{w['id']}.mp3", sem=sem))
+        # '문장 듣기' 버튼용 — 80% 속도
+        jobs.append(say(w['sentence'], OUT / 'xs' / f"{w['id']}.mp3", rate=SENTENCE_SLOW, sem=sem))
     for key, text in UI.items():
         jobs.append(say(text, OUT / 'ui' / f'{key}.mp3', sem=sem))
     made = await asyncio.gather(*jobs)

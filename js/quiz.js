@@ -298,7 +298,9 @@ function sentenceLine(w) {
   const tokens = w.sentence.split(' ');
   const map = []; // 비교용 낱말 번호 → 칸
   tokens.forEach((tok, i) => {
-    const span = el('span', 'tok', tok);
+    // 영어 낱말 위, 한글 읽기 아래 — 아이가 소리 내어 따라 할 수 있게
+    const span = el('span', 'tok');
+    span.append(el('span', 'tok-en', tok), el('span', 'tok-ko', (w.sentenceRead || [])[i] || ''));
     const norm = speak.words(tok);
     if (norm.some((n) => keys.some((k) => n.startsWith(k)))) span.classList.add('is-key');
     norm.forEach(() => map.push(span));
@@ -343,7 +345,7 @@ function showSentence(w, next) {
       const art = el('div', 'sheet-art');
       art.appendChild(artEl(w, { motion: !st.settings.calm }));
       const line = sentenceLine(w);
-      const again = button('helper', null, () => playWith(again, audio.sentenceSrc(w.id)));
+      const again = button('helper', null, () => playWith(again, audio.sentenceSrc(w.id, true))); // 80% 속도
       again.append(earIcon(), document.createTextNode('문장 듣기'));
       const go = button('cta line-go', '다음 ▶');
       go.disabled = true;

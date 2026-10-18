@@ -35,6 +35,12 @@ function ensure() {
 export function unlock() {
   const c = ensure();
   if (!c) return;
+  // iPadOS 17+: 처음부터 '재생' 세션으로 (녹음 뒤 작아진 소리도 여기서 되돌아온다)
+  try {
+    if (navigator.audioSession && navigator.audioSession.type !== 'play-and-record') navigator.audioSession.type = 'playback';
+  } catch (e) {
+    /* 지원하지 않는 브라우저 */
+  }
   if (c.state !== 'running') c.resume().catch(() => {});
   // iOS: 무음 한 조각을 재생해 출력 경로를 연다
   const b = c.createBuffer(1, 1, 22050);
@@ -169,5 +175,6 @@ export function sfx(kind) {
 
 /* ---------- 파일 경로 ---------- */
 export const wordSrc = (id, slow = false) => `assets/audio/${slow ? 's' : 'w'}/${id}.mp3`;
-export const sentenceSrc = (id) => `assets/audio/x/${id}.mp3`;
+/** slow = 80% 속도로 녹음한 문장 (문장 듣기 버튼) */
+export const sentenceSrc = (id, slow = false) => `assets/audio/${slow ? "xs" : "x"}/${id}.mp3`;
 export const uiSrc = (key) => `assets/audio/ui/${key}.mp3`;

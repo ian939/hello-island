@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / 'tools'))
 from curation import ART, CONFUSE, NUMBER_GAP  # noqa: E402
 from sentences import SENTENCES  # noqa: E402
 from words_source import all_words  # noqa: E402
+from hangul import read_sentence  # noqa: E402
 
 SEED = ROOT / 'tools' / 'seed'
 
@@ -120,6 +121,7 @@ def main():
             'motion': motion(w),
             'sentence': sentence(w)[0],
             'sentenceKo': sentence(w)[1],
+            'sentenceRead': read_sentence(sentence(w)[0]),  # 낱말마다 한글 읽기
             'confuse': groups.get(art_key(w), []),
             'numberGap': NUMBER_GAP.get(w['stage_id'], 0) if ART[art_key(w)].startswith('N:') else 0,
             'value': int(ART[art_key(w)][2:]) if ART[art_key(w)].startswith('N:') else None,

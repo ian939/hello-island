@@ -28,6 +28,16 @@ const NUM = {
   19: 'nineteen', 20: 'twenty',
 };
 
+/* iPadOS 17+ Safari: 오디오 세션 종류를 직접 정한다.
+ * 녹음하는 동안만 'play-and-record', 끝나면 'playback' 으로 돌려 놓아야 이후 소리가 작아지지 않는다. */
+export function setSession(type) {
+  try {
+    if (navigator.audioSession && navigator.audioSession.type !== type) navigator.audioSession.type = type;
+  } catch (e) {
+    /* 지원하지 않는 브라우저 */
+  }
+}
+
 /** 비교용 낱말: 소문자, 문장부호·따옴표 제거, 숫자는 영어 낱말로 */
 export function words(text) {
   return String(text)
@@ -109,6 +119,7 @@ export function listenOnce() {
       if (recorder && recorder.state !== 'inactive') recorder.stop();
       const url = await recDone;
       if (stream) stream.getTracks().forEach((t) => t.stop()); // 마이크를 꺼야 스피커 소리가 정상으로 돌아온다
+      setSession('playback');
       resolve({ url, transcripts, error });
     };
     stopRec = () => {
@@ -119,6 +130,7 @@ export function listenOnce() {
       }
     };
 
+    setSession('play-and-record');
     const rec = new SR();
     rec.lang = 'en-US';
     rec.interimResults = false;
@@ -147,7 +159,8 @@ export function listenOnce() {
     // 자기 목소리 다시 듣기용 녹음. 안 되면 인식만 한다.
     if (window.MediaRecorder && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       navigator.mediaDevices
-        .getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })
+        // 에코 제거를 켜면 iPad 가 '통화 모드'로 바뀌어 스피커 소리가 작아지고, 마이크를 끈 뒤에도 남는다 → 끈다
+        .getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } })
         .then((s) => {
           stream = s;
           try {
