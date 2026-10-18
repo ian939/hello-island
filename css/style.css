@@ -896,3 +896,9 @@ body.is-calm [class^='mv-'], body.is-calm [class*=' mv-'] { animation: none !imp
 .sheet--line .line-go { min-height: 64px; }
 .speak-meter.is-pass span { color: var(--ink); }
 .speak-meter span { text-shadow: 0 0 3px var(--paper), 0 0 3px var(--paper); }
+
+/* 따라 녹음하기: 몇 번 녹음했는지 동그라미 두 개 */
+.rec-dots { display: flex; gap: 10px; }
+.rec-dots i { width: 22px; height: 22px; border-radius: 50%; border: 3px solid var(--ink); background: var(--paper); }
+.rec-dots i.is-on { background: var(--jade); }
+.mine-row:empty { display: none; }

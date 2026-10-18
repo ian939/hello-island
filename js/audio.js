@@ -1,83 +1,77 @@
 /* 소리 — 학습의 중심.
  *
- * iPad 사파리는 사용자가 누르기 전에는 소리를 못 낸다. 첫 터치(탐험 시작 등)에서 unlock() 으로
- * AudioContext 를 깨우고, 그 뒤로는 Web Audio 로 미리 녹음한 mp3 를 재생한다.
+ * 영어 음성(단어·문장·안내·내 목소리)은 <audio> 요소 하나로 재생한다.
+ * iPad 에서 <audio> 는 음악 재생과 같은 경로라 기기 음량 그대로 들린다.
+ * (Web Audio 로 음성을 틀면 마이크를 쓴 뒤 등에 소리가 작게 남는 일이 있었다)
+ *
+ * - iPad 사파리는 사용자가 누르기 전에는 소리를 못 낸다. 첫 터치에서 unlock() 으로
+ *   같은 <audio> 요소를 한 번 재생해 두면, 그 뒤로는 터치 밖에서도 재생할 수 있다.
  * - 새 소리를 틀면 앞 소리는 바로 끈다 (빠르게 연타해도 겹치지 않게).
  * - 재생이 막히면 조용히 넘어가지 않고 '눌러서 소리 켜기' 버튼을 띄운다 (onBlocked).
- * - 효과음은 파일 없이 만들고, 말소리보다 작게.
- * - iPad Safari 버그: 마이크를 한 번 켰다 끄면 그 전에 만든 AudioContext 의 음량이 작게 남는다.
- *   녹음 뒤에는 markStale() 로 표시해 두고, 다음 터치(unlock) 때 AudioContext 를 새로 만든다.
- *   (새 AudioContext 는 터치 안에서 만들어야 iPad 가 소리를 허락한다)
+ * - 효과음(딩동 등)만 파일 없이 Web Audio 로 작게 만든다.
  */
 
-let ctx = null;
-let voiceGain = null;
-let sfxGain = null;
-let current = null;
+/* 0.05초짜리 무음 WAV — 첫 터치에서 <audio> 를 깨우는 데 쓴다 */
+function silentWav() {
+  const rate = 8000;
+  const n = 400;
+  const buf = new ArrayBuffer(44 + n);
+  const v = new DataView(buf);
+  const str = (o, t) => [...t].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  str(0, 'RIFF');
+  v.setUint32(4, 36 + n, true);
+  str(8, 'WAVEfmt ');
+  v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true); // PCM
+  v.setUint16(22, 1, true); // 모노
+  v.setUint32(24, rate, true);
+  v.setUint32(28, rate, true);
+  v.setUint16(32, 1, true);
+  v.setUint16(34, 8, true); // 8비트
+  str(36, 'data');
+  v.setUint32(40, n, true);
+  for (let i = 0; i < n; i += 1) v.setUint8(44 + i, 128); // 8비트 무음 = 128
+  return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+}
+let SILENT = null;
+
+let voice = null; // 음성 전용 <audio> 하나
+let unlocked = false;
 let token = 0;
 let muted = false;
-let stale = false; // 녹음 뒤 — 다음 터치에서 소리 엔진을 새로 만든다
-const buffers = new Map();
+let ctx = null; // 효과음 전용
+let sfxGain = null;
+const warmed = new Set();
 
 export const audioState = { onBlocked: null, onSpeaking: null };
 
-function ensure() {
-  if (ctx) return ctx;
-  const AC = window.AudioContext || window.webkitAudioContext;
-  if (!AC) return null;
-  ctx = new AC();
-  // 말소리는 조금 키우고, 압축기로 깨지지 않게 (패드 스피커에서 작게 들리지 않게)
-  const comp = ctx.createDynamicsCompressor();
-  comp.threshold.value = -14;
-  comp.knee.value = 8;
-  comp.ratio.value = 4;
-  comp.attack.value = 0.003;
-  comp.release.value = 0.2;
-  comp.connect(ctx.destination);
-  voiceGain = ctx.createGain();
-  voiceGain.gain.value = 1.8;
-  voiceGain.connect(comp);
-  sfxGain = ctx.createGain();
-  sfxGain.gain.value = 0.18;
-  sfxGain.connect(ctx.destination);
-  return ctx;
-}
-
-/** 녹음이 끝났다 — 다음 터치에서 소리 엔진을 새로 만든다 */
-export function markStale() {
-  stale = true;
-}
-
-function rebuild() {
-  stop();
-  try {
-    if (ctx) ctx.close();
-  } catch (e) {
-    /* 이미 닫힘 */
+function el() {
+  if (!voice) {
+    voice = new Audio();
+    voice.preload = 'auto';
+    voice.setAttribute('playsinline', '');
   }
-  ctx = null;
-  buffers.clear(); // 새 엔진에서 다시 풀어 쓴다
-  stale = false;
+  return voice;
 }
 
-/** 반드시 터치 이벤트 안에서 부른다 */
+/** 터치 이벤트 안에서 부른다 — <audio> 와 효과음을 깨운다 */
 export function unlock() {
-  if (stale) rebuild();
-  const c = ensure();
-  if (!c) return;
-  // iPadOS 17+: 처음부터 '재생' 세션으로 (녹음 뒤 작아진 소리도 여기서 되돌아온다)
-  try {
-    if (navigator.audioSession && navigator.audioSession.type !== 'play-and-record') navigator.audioSession.type = 'playback';
-  } catch (e) {
-    /* 지원하지 않는 브라우저 */
+  const v = el();
+  if (!unlocked) {
+    if (!SILENT) SILENT = silentWav();
+    v.src = SILENT;
+    const p = v.play();
+    if (p && p.then) p.then(() => (unlocked = true)).catch(() => {});
+    else unlocked = true;
   }
-  if (c.state !== 'running') c.resume().catch(() => {});
-  // iOS: 무음 한 조각을 재생해 출력 경로를 연다
-  const b = c.createBuffer(1, 1, 22050);
-  const s = c.createBufferSource();
-  s.buffer = b;
-  s.connect(c.destination);
-  s.start(0);
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (AC && !ctx) {
+    ctx = new AC();
+    sfxGain = ctx.createGain();
+    sfxGain.gain.value = 0.18;
+    sfxGain.connect(ctx.destination);
+  }
+  if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {});
 }
 
 export const isRunning = () => Boolean(ctx && ctx.state === 'running');
@@ -86,36 +80,22 @@ export const setMuted = (m) => {
   if (m) stop();
 };
 
-function load(src) {
-  if (buffers.has(src)) return buffers.get(src);
-  const p = fetch(src)
-    .then((r) => {
-      if (!r.ok) throw new Error(`${r.status} ${src}`);
-      return r.arrayBuffer();
-    })
-    .then((ab) => new Promise((res, rej) => ensure().decodeAudioData(ab, res, rej)));
-  buffers.set(src, p);
-  p.catch(() => buffers.delete(src));
-  // 너무 많이 쌓이지 않게 오래된 것부터 지운다
-  if (buffers.size > 160) buffers.delete(buffers.keys().next().value);
-  return p;
+/** 다음에 틀 파일을 미리 받아 둔다 (브라우저 캐시) */
+export function preload(srcs) {
+  for (const s of srcs) {
+    if (warmed.has(s)) continue;
+    warmed.add(s);
+    if (warmed.size > 400) warmed.clear();
+    fetch(s).catch(() => warmed.delete(s));
+  }
 }
 
-export function preload(srcs) {
-  if (!ensure()) return;
-  for (const s of srcs) load(s).catch(() => {});
-}
+let pendingEnd = null; // 지금 재생 중인 소리를 기다리는 쪽 — 멈출 때도 반드시 끝을 알려 준다
 
 export function stop() {
   token += 1;
-  if (current) {
-    try {
-      current.stop();
-    } catch (e) {
-      /* 이미 멈춤 */
-    }
-    current = null;
-  }
+  if (voice) voice.pause();
+  if (pendingEnd) pendingEnd(false);
   speaking(false);
 }
 
@@ -125,6 +105,33 @@ function speaking(on) {
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+function playOne(src, my) {
+  const v = el();
+  return new Promise((resolve) => {
+    let done = false;
+    const end = (ok) => {
+      if (done) return;
+      done = true;
+      if (pendingEnd === end) pendingEnd = null;
+      v.onended = null;
+      v.onerror = null;
+      resolve(ok);
+    };
+    pendingEnd = end;
+    v.onended = () => end(true);
+    v.onerror = () => end(false);
+    v.src = src;
+    v.currentTime = 0;
+    const p = v.play();
+    if (p && p.catch) {
+      p.catch((err) => {
+        if (my === token && err && err.name === 'NotAllowedError' && audioState.onBlocked) audioState.onBlocked();
+        end(false);
+      });
+    }
+  });
+}
+
 /**
  * 여러 소리를 차례로 재생한다. 중간에 다른 소리가 오면 그만둔다.
  * @returns {Promise<boolean>} 끝까지 재생했으면 true
@@ -133,41 +140,13 @@ export async function play(srcs, { gap = 220 } = {}) {
   stop();
   const my = token;
   if (muted) return false;
-  const c = ensure();
-  if (!c) return false;
-  if (c.state !== 'running') {
-    try {
-      await Promise.race([c.resume(), wait(400)]);
-    } catch (e) {
-      /* 아래에서 처리 */
-    }
-    if (c.state !== 'running') {
-      if (audioState.onBlocked) audioState.onBlocked();
-      return false;
-    }
-  }
   const list = Array.isArray(srcs) ? srcs : [srcs];
   for (let i = 0; i < list.length; i += 1) {
-    let buf;
-    try {
-      buf = await load(list[i]);
-    } catch (err) {
-      console.warn('소리를 불러오지 못함', list[i], err);
-      continue;
-    }
-    if (my !== token) return false;
-    const node = c.createBufferSource();
-    node.buffer = buf;
-    node.connect(voiceGain);
-    current = node;
     speaking(true);
-    await new Promise((res) => {
-      node.onended = res;
-      node.start(0);
-    });
+    const ok = await playOne(list[i], my);
     if (my !== token) return false;
-    current = null;
     speaking(false);
+    if (!ok) return false;
     if (i < list.length - 1) await wait(gap);
     if (my !== token) return false;
   }
@@ -205,6 +184,6 @@ export function sfx(kind) {
 
 /* ---------- 파일 경로 ---------- */
 export const wordSrc = (id, slow = false) => `assets/audio/${slow ? 's' : 'w'}/${id}.mp3`;
-/** slow = 80% 속도로 녹음한 문장 (문장 듣기 버튼) */
-export const sentenceSrc = (id, slow = false) => `assets/audio/${slow ? "xs" : "x"}/${id}.mp3`;
+/** slow = 80% 속도로 녹음한 문장 */
+export const sentenceSrc = (id, slow = false) => `assets/audio/${slow ? 'xs' : 'x'}/${id}.mp3`;
 export const uiSrc = (key) => `assets/audio/ui/${key}.mp3`;

@@ -303,17 +303,3 @@ test('저장 상태: 저장→복원 후 남은 카드·오답 큐·수집 기�
   assert.equal(old.session.stage, 'age6');
   assert.equal(old.words['animals-cat'].discoveredAt, T);
 });
-
-test('따라 말하기 점수: 순서대로 맞힌 낱말 비율, 숫자·축약형·대소문자 무시', async () => {
-  const { score, bestOf, PASS } = await import('../js/speak.js');
-  assert.equal(score('The cat says meow.', 'the cat says meow').ratio, 1);
-  assert.equal(score('The cat says meow.', 'cat says').ratio, 0.5);
-  assert.equal(score('I have three apples.', 'I have 3 apples').ratio, 1);
-  assert.equal(score("Let's eat!", 'lets eat').ratio, 1);
-  assert.equal(score('The cat says meow.', 'meow says cat the').ratio, 0.25); // 순서가 뒤죽박죽이면 낮게
-  const b = bestOf('The dog says woof.', ['the doc says', 'the dog says woof']);
-  assert.equal(b.ratio, 1);
-  assert.ok(score('The dog says woof.', 'dog').ratio >= PASS); // 4낱말 중 1개 = 25% 통과
-  assert.ok(score('The dog says woof.', '').ratio < PASS);
-assert.ok(score('Our solar system has eight planets.', 'our').ratio < PASS); // 6낱말 중 1개 = 17%
-});

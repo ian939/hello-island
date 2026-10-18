@@ -161,9 +161,7 @@ export function summarize(s) {
     retries: s.retries,
     hints: s.hints,
     found: s.found.length,
-    speakCards: s.speakCards || 0, // 따라 말하기를 해 본 카드
-    speakPass: s.speakPass || 0, // 그중 70% 넘긴 카드
-    speakTries: s.speakTries || 0,
+    speakDone: s.speakDone || 0, // 두 번 따라 녹음한 문장 수
     finishedAt: Date.now(),
   };
 }

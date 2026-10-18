@@ -220,10 +220,10 @@ function renderQuiz() {
   // 다음 카드 소리·그림 미리 받기
   const nextCard = s.cards[s.order[1]];
   if (nextCard) {
-    audio.preload(nextCard.options.map((o) => audio.wordSrc(o)).concat(audio.sentenceSrc(nextCard.word)));
+    audio.preload(nextCard.options.map((o) => audio.wordSrc(o)).concat(audio.sentenceSrc(nextCard.word, true)));
     for (const src of artSrcs(content.words[nextCard.word])) new Image().src = src;
   }
-  audio.preload(card.options.map((o) => audio.wordSrc(o, state.settings.slow)).concat(audio.sentenceSrc(card.word)));
+  audio.preload(card.options.map((o) => audio.wordSrc(o, state.settings.slow)).concat(audio.sentenceSrc(card.word, true)));
 
   function answer(choice) {
     busy = true;
@@ -291,34 +291,18 @@ function renderQuiz() {
  * '다음'은 3초 동안 잠겨 있다 (막대가 차오르면 눌러서 넘어간다). */
 const SENTENCE_LOCK_MS = 3000;
 
-/* 문장을 낱말 칸으로 — 단어는 노랑, 따라 말하기 뒤에는 맞힌 낱말 초록 / 놓친 낱말 점선 */
+/* 문장을 낱말 칸으로 — 영어 낱말 위, 한글 읽기 아래. 정답 단어는 노랑. */
 function sentenceLine(w) {
   const p = el('p', 'line-en');
-  const keys = speak.words(w.en);
+  const key = w.en.toLowerCase().split(' ')[0];
   const tokens = w.sentence.split(' ');
-  const map = []; // 비교용 낱말 번호 → 칸
   tokens.forEach((tok, i) => {
-    // 영어 낱말 위, 한글 읽기 아래 — 아이가 소리 내어 따라 할 수 있게
     const span = el('span', 'tok');
     span.append(el('span', 'tok-en', tok), el('span', 'tok-ko', (w.sentenceRead || [])[i] || ''));
-    const norm = speak.words(tok);
-    if (norm.some((n) => keys.some((k) => n.startsWith(k)))) span.classList.add('is-key');
-    norm.forEach(() => map.push(span));
+    if (tok.toLowerCase().replace(/[^a-z-]/g, '').startsWith(key)) span.classList.add('is-key');
     p.append(span);
     if (i < tokens.length - 1) p.append(document.createTextNode(' '));
   });
-  p.paint = (hit) => {
-    map.forEach((span) => span.classList.remove('is-hit', 'is-miss'));
-    hit.forEach((ok, k) => {
-      const span = map[k];
-      if (!span) return;
-      // 낱말 하나가 둘로 나뉜 경우(yo-yo 등) 하나라도 놓치면 놓친 것으로
-      if (!ok) {
-        span.classList.remove('is-hit');
-        span.classList.add('is-miss');
-      } else if (!span.classList.contains('is-miss')) span.classList.add('is-hit');
-    });
-  };
   return p;
 }
 
@@ -332,20 +316,27 @@ function micIcon() {
   return s;
 }
 
+const PRAISE = ['잘했어! 한 번 더 따라 해 볼까?', '최고야! 두 번 다 따라 했어!'];
+
 /* 정답 뒤 문장 팝업
- * 따라 말하기를 쓸 수 있으면: 말하기 → 내 목소리 한 번 듣기 → 70% 넘으면 '다음' (3번 안 되면 격려하고 '다음')
- * 못 쓰면(마이크·인식·인터넷 없음, 보호자가 끔): 3초 뒤에 '다음' */
+ * 1) 문장 발음을 두 번 연속 들려준다
+ * 2) 아이가 두 번 따라 녹음한다 — 녹음할 때마다 내 목소리를 바로 들려준다 (점수는 매기지 않는다)
+ * 3) 두 번 다 하면 '다음'
+ * 마이크를 못 쓰면(거부·미지원·보호자가 끔) 3초 뒤에 '다음' */
 function showSentence(w, next) {
   const st = app.state;
   const sess = st.session;
   const practice = st.settings.speak !== false && speak.isAvailable();
+  const twice = () => audio.play([audio.sentenceSrc(w.id, true), audio.sentenceSrc(w.id, true)], { gap: 700 });
   openSheet(
     (sh) => {
       sh.classList.add('sheet--line');
       const art = el('div', 'sheet-art');
       art.appendChild(artEl(w, { motion: !st.settings.calm }));
-      const line = sentenceLine(w);
-      const again = button('helper', null, () => playWith(again, audio.sentenceSrc(w.id, true))); // 80% 속도
+      const again = button('helper', null, () => {
+        again.classList.add('is-playing');
+        twice().then(() => again.classList.remove('is-playing'));
+      });
       again.append(earIcon(), document.createTextNode('문장 듣기'));
       const go = button('cta line-go', '다음 ▶');
       go.disabled = true;
@@ -359,7 +350,7 @@ function showSentence(w, next) {
         go.disabled = false;
         go.classList.add('is-ready');
       };
-      sh.append(art, line, el('p', 'line-ko', w.sentenceKo));
+      sh.append(art, sentenceLine(w), el('p', 'line-ko', w.sentenceKo));
 
       if (!practice) {
         const fill = el('b');
@@ -376,143 +367,93 @@ function showSentence(w, next) {
         return;
       }
 
-      // ----- 따라 말하기 -----
-      let tries = 0;
-      let listening = null;
-      let mineUrl = null;
-      let passed = false;
-
+      // ----- 따라 녹음하기 -----
+      let count = 0;
+      let rec = null;
+      const urls = [];
       const box = el('div', 'speak');
       const mic = button('mic');
-      const micLabel = el('span', null, '따라 말하기');
+      const micLabel = el('span', null, '따라 녹음하기');
       mic.append(micIcon(), micLabel);
-      const meter = el('div', 'speak-meter');
-      const meterFill = el('i');
-      const meterText = el('span', null, '말해 보면 점수가 나와');
-      meter.style.setProperty('--pass', `${speak.PASS * 100}%`);
-      meter.append(meterFill, meterText);
+      const dots = el('div', 'rec-dots');
+      for (let i = 0; i < speak.TIMES; i += 1) dots.appendChild(el('i'));
       const sayLine = el('p', 'speak-say', '문장을 듣고 똑같이 말해 봐!');
-      const mine = button('helper is-hidden');
-      mine.append(earIcon(), document.createTextNode('내 목소리'));
+      const mineRow = el('div', 'helper-row mine-row');
+      box.append(mic, dots, sayLine, mineRow);
       const tools = el('div', 'helper-row');
-      tools.append(again, mine);
-      box.append(mic, sayLine, meter);
+      tools.append(again);
       sh.append(tools, box, go);
-      sh.addEventListener('sheet-close', () => {
-        if (listening) listening.stop();
-        if (mineUrl) URL.revokeObjectURL(mineUrl);
-      }, { once: true });
+      sh.addEventListener(
+        'sheet-close',
+        () => {
+          if (rec) rec.stop();
+          urls.forEach((u) => URL.revokeObjectURL(u));
+        },
+        { once: true },
+      );
 
-      let pending = null; // 듣기 전 결과 — 내 목소리를 들은 뒤에 발표한다
-
-      // 내 목소리 듣기: 아이가 직접 누른다. 그 터치에서 소리 엔진을 새로 만들어 녹음 뒤에도 소리가 작아지지 않게.
-      mine.onclick = async () => {
-        if (!mineUrl || listening) return;
-        mine.classList.remove('is-call');
-        await playWith(mine, mineUrl);
-        if (pending) {
-          const r = pending;
-          pending = null;
-          announce(r);
-        }
-      };
-
-      // 내 목소리를 들은 뒤에 점수와 맞힌 낱말을 보여 준다
-      const announce = (r) => {
-        const pct = Math.round(r.ratio * 100);
-        line.paint(r.hit);
-        meterFill.style.width = `${pct}%`;
-        meterText.textContent = `${pct}%`;
-        meter.classList.toggle('is-pass', r.ratio >= speak.PASS);
-        mic.disabled = false;
-        if (r.ratio >= speak.PASS) {
-          const [text, voice] = praise(pct);
-          audio.sfx('star');
-          setTimeout(() => audio.play(audio.uiSrc(voice)), 250);
-          sayLine.textContent = text;
-          sayLine.classList.add('is-praise');
-          micLabel.textContent = '한 번 더 말하기';
-          if (!passed && sess) sess.speakPass = (sess.speakPass || 0) + 1;
-          passed = true;
-          ready();
-        } else if (tries < speak.MAX_TRIES && !passed) {
-          sayLine.textContent = `소리가 잘 안 들렸어. 조금 크게 한 번 더! (${tries}/${speak.MAX_TRIES})`;
-          micLabel.textContent = '다시 말하기';
-        } else {
-          sayLine.textContent = '잘했어! 다음에 또 해 보자';
-          sayLine.classList.add('is-praise');
-          setTimeout(() => audio.play(audio.uiSrc('nice')), 250);
-          micLabel.textContent = '한 번 더 말하기';
-          ready();
-        }
-        app.save();
+      const mineButton = (url, n) => {
+        const b = button('helper', null, () => playWith(b, url));
+        b.append(earIcon(), document.createTextNode(`내 목소리 ${n}`));
+        mineRow.appendChild(b);
+        return b;
       };
 
       mic.addEventListener('click', async () => {
-        if (listening) {
-          listening.stop();
+        if (rec) {
+          rec.stop();
           return;
         }
         audio.stop();
-        tries += 1;
-        pending = null;
-        sayLine.classList.remove('is-praise');
         mic.classList.add('is-on');
-        micLabel.textContent = '다 말했어';
+        micLabel.textContent = '다 했어';
         sayLine.textContent = '말해 봐! 다 말하면 버튼을 눌러';
-        listening = speak.listenOnce();
-        const res = await listening.done;
-        listening = null;
-        audio.markStale(); // 마이크를 쓴 뒤 — 다음 터치에서 소리 엔진을 새로 만든다
+        rec = speak.recordOnce();
+        const res = await rec.done;
+        rec = null;
         mic.classList.remove('is-on');
         if (!document.body.contains(mic)) return; // 그새 창이 닫혔다
-        if (res.error) {
-          speak.markBlocked();
-          sayLine.textContent = '마이크를 쓸 수 없어서 이번엔 건너뛸게';
-          micLabel.textContent = '따라 말하기';
-          mic.disabled = true;
-          ready();
+        if (res.error || !res.url) {
+          if (res.error) {
+            speak.markBlocked();
+            sayLine.textContent = '마이크를 쓸 수 없어서 이번엔 건너뛸게';
+            mic.disabled = true;
+            ready();
+            return;
+          }
+          sayLine.textContent = '녹음이 안 됐어. 다시 눌러서 말해 봐!';
+          micLabel.textContent = '따라 녹음하기';
           return;
         }
-        const r = speak.bestOf(w.sentence, res.transcripts);
-        micLabel.textContent = '따라 말하기';
-        if (mineUrl) URL.revokeObjectURL(mineUrl);
-        mineUrl = res.url;
-        recordSpeak(w.id, r.ratio, tries);
-
-        if (mineUrl) {
-          // 내 목소리를 한 번 들어야 결과가 나온다
-          mine.classList.remove('is-hidden');
-          mine.classList.add('is-call');
-          mic.disabled = true;
-          sayLine.textContent = '내 목소리를 눌러서 들어 봐!';
-          pending = r;
-        } else announce(r);
+        count += 1;
+        urls.push(res.url);
+        dots.children[Math.min(count, speak.TIMES) - 1].classList.add('is-on');
+        const b = mineButton(res.url, count);
+        // 내 목소리를 바로 들려준다
+        mic.disabled = true;
+        sayLine.textContent = '내 목소리야!';
+        await playWith(b, res.url);
+        mic.disabled = false;
+        if (count < speak.TIMES) {
+          sayLine.textContent = PRAISE[0];
+          micLabel.textContent = `한 번 더 녹음 (${count + 1}/${speak.TIMES})`;
+        } else {
+          if (count === speak.TIMES) {
+            audio.sfx('star');
+            audio.play(audio.uiSrc('great'));
+            if (sess) sess.speakDone = (sess.speakDone || 0) + 1;
+            app.save();
+          }
+          sayLine.textContent = PRAISE[1];
+          sayLine.classList.add('is-praise');
+          micLabel.textContent = '또 녹음하기';
+          ready();
+        }
       });
     },
     { dismissable: false },
   );
-  audio.play(audio.sentenceSrc(w.id));
-}
-
-/* 점수에 맞춘 칭찬 [문구, 칭찬 음성] — 25% 만 넘어도 칭찬한다 */
-function praise(pct) {
-  if (pct >= 90) return [`완벽해! ${pct}%! 영어 박사네!`, 'wow'];
-  if (pct >= 70) return [`정말 잘했어! ${pct}% 따라 말했어!`, 'great'];
-  if (pct >= 50) return [`멋져! ${pct}%! 목소리가 또렷해!`, 'yes'];
-  return [`좋아! ${pct}%! 용감하게 말했어!`, 'nice'];
-}
-
-/* 따라 말하기 기록 (보호자 화면용) */
-function recordSpeak(id, ratio, tries) {
-  const st = app.state;
-  const p = st.words[id];
-  if (p) p.speakBest = Math.max(p.speakBest || 0, Math.round(ratio * 100));
-  const s = st.session;
-  if (s) {
-    s.speakTries = (s.speakTries || 0) + 1;
-    if (tries === 1) s.speakCards = (s.speakCards || 0) + 1;
-  }
+  twice();
 }
 
 /* ---------- 10장마다 쉬어 가기 ---------- */
