@@ -3,6 +3,7 @@ import { buildContent } from './engine/content.js';
 import { localDate, makeRng } from './engine/util.js';
 import { refreshUnlocks, stageTotals, zoneTotals, isZoneOpen, isStageOpen } from './engine/map.js';
 import { level } from './engine/progress.js';
+import { summarize } from './engine/session.js';
 import { loadState, saveState } from './store.js';
 import * as audio from './audio.js';
 import { artEl } from './art.js';
@@ -122,7 +123,13 @@ function renderHome() {
       resumeSession();
     });
     cta.appendChild(el('small', null, `${yesterday ? '전에 하던 탐험 · ' : ''}${s.done} / ${s.target}장`));
-    root.appendChild(cta);
+    const quit = button('quit', '그만하고 다른 거 하기', () =>
+      askLeave(() => {
+        renderHome();
+        toast('모은 친구는 그대로 있어. 다른 탐험을 골라 봐!');
+      }),
+    );
+    root.append(cta, quit);
   } else {
     const cta = button('cta', '탐험 시작', () => openGoalSheet(null));
     cta.appendChild(el('small', null, '단어 친구 30명과 만나기'));
@@ -131,14 +138,12 @@ function renderHome() {
 
   const gate = state.map.gate[stage.id];
   if (gate === 'ready') {
-    const g = button('cta cta--gate', '최종 미션 · 새 지도 문 열기', () => {
-      if (state.session && state.session.status !== 'completed') {
-        toast('하던 탐험을 먼저 끝내면 열 수 있어');
-        return;
-      }
-      audio.unlock();
-      startGate(stage.id);
-    });
+    const g = button('cta cta--gate', '최종 미션 · 새 지도 문 열기', () =>
+      askLeave(() => {
+        audio.unlock();
+        startGate(stage.id);
+      }),
+    );
     g.appendChild(el('small', null, `${t.total}명 모두 모았어! 20장 복습`));
     root.appendChild(g);
   } else if (t.found === t.total && t.ready < t.total) {
@@ -211,26 +216,59 @@ app.pad = pad;
 
 /* 탐험 시작 — 섬 전체면 서로 다른 단어 30개, 구역이면 그 구역 단어 전부. 하던 판이 있으면 이어 하기부터. */
 function openGoalSheet(zoneId) {
-  const { state } = app;
-  if (state.session && state.session.status !== 'completed') {
-    openSheet((sh) => {
-      sh.append(el('h2', 'sheet-title', '하던 탐험이 있어'), el('p', 'sheet-text', `${state.session.done} / ${state.session.target}장까지 했어.\n이어서 할까?`));
-      const b = el('div', 'sheet-buttons');
-      b.append(
-        button('btn btn--go', '이어서 하기', () => {
-          audio.unlock();
-          closeSheet();
-          resumeSession();
-        }),
-        button('btn', '닫기', closeSheet),
-      );
-      sh.appendChild(b);
-    });
+  askLeave(() => {
+    audio.unlock();
+    audio.sfx('tap');
+    startSession(zoneId);
+  });
+}
+
+const hasSession = () => Boolean(app.state.session && app.state.session.status !== 'completed');
+
+/* 하던 탐험이 있을 때 다른 걸 하려면: [이어서 하기] / [그만하고 이걸로 하기]
+ * 그만둬도 이미 맞힌 단어·모은 친구·별 조각은 그대로 남는다 (매 답마다 저장돼 있다). */
+function askLeave(then) {
+  if (!hasSession()) {
+    then();
     return;
   }
-  audio.unlock();
-  audio.sfx('tap');
-  startSession(zoneId);
+  const s = app.state.session;
+  const where = s.kind === 'gate' ? '최종 미션' : s.zone ? app.content.zones[s.zone].title : '탐험';
+  openSheet((sh) => {
+    sh.append(
+      el('p', 'sheet-eyebrow', `${where} · ${s.done} / ${s.target}장`),
+      el('h2', 'sheet-title', '하던 탐험이 있어'),
+      el('p', 'sheet-text', '이어서 할까, 그만하고 다른 걸 할까?\n모은 친구는 그대로 남아.'),
+    );
+    const b = el('div', 'sheet-buttons');
+    b.append(
+      button('btn btn--go', '이어서 하기', () => {
+        audio.unlock();
+        closeSheet();
+        resumeSession();
+      }),
+      button('btn', '그만하고 이걸로 하기', () => {
+        closeSheet();
+        leaveSession();
+        then();
+      }),
+      button('btn', '닫기', closeSheet),
+    );
+    sh.appendChild(b);
+  });
+}
+
+function leaveSession() {
+  const { state } = app;
+  const s = state.session;
+  if (!s) return;
+  const sum = summarize(s);
+  sum.incomplete = true;
+  state.history.push(sum);
+  if (state.history.length > 120) state.history.shift();
+  if (s.kind === 'gate' && state.map.gate[s.stage] === 'in_progress') state.map.gate[s.stage] = 'ready';
+  state.session = null;
+  app.save();
 }
 app.openGoalSheet = openGoalSheet;
 
@@ -337,12 +375,12 @@ function renderMap() {
         return;
       }
       if (state.map.current !== s.id) {
-        if (state.session && state.session.status !== 'completed') {
-          toast('하던 탐험을 먼저 끝내면 지도를 옮길 수 있어');
-          return;
-        }
-        state.map.current = s.id;
-        app.save();
+        askLeave(() => {
+          state.map.current = s.id;
+          app.save();
+          renderHome();
+        });
+        return;
       }
       renderHome();
     });

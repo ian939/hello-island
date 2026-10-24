@@ -902,3 +902,17 @@ body.is-calm [class^='mv-'], body.is-calm [class*=' mv-'] { animation: none !imp
 .rec-dots i { width: 22px; height: 22px; border-radius: 50%; border: 3px solid var(--ink); background: var(--paper); }
 .rec-dots i.is-on { background: var(--jade); }
 .mine-row:empty { display: none; }
+
+/* 문장 두 번을 다 들어 녹음 버튼이 켜진 순간 */
+.mic.is-ready { animation: mic-ready 1s ease-in-out 3; }
+@keyframes mic-ready { 50% { transform: scale(1.06); box-shadow: 4px 4px 0 var(--ink), 0 0 0 10px rgba(213, 55, 42, .22); } }
+
+/* 홈: 하던 탐험 그만하기 — 큰 버튼 밑에 조용하게 */
+.quit {
+  display: block; width: 100%;
+  min-height: 52px; margin-top: 12px;
+  font-size: 17px; font-weight: 700; color: var(--ink-soft);
+  background: none; border: 3px dashed var(--ink-soft);
+  cursor: pointer;
+}
+.quit:active { transform: translateY(2px); }

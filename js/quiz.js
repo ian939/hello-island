@@ -322,12 +322,28 @@ const PRAISE = ['잘했어! 한 번 더 따라 해 볼까?', '최고야! 멋지�
  * 1) 문장 발음을 두 번 연속 들려준다
  * 2) 아이가 두 번 따라 녹음한다 — 녹음할 때마다 내 목소리를 바로 들려준다 (점수는 매기지 않는다)
  * 3) 두 번 다 하면 '다음'
- * 마이크를 못 쓰면(거부·미지원·보호자가 끔) 3초 뒤에 '다음' */
+ * 마이크를 못 쓰면(거부·미지원·보호자가 끔) 3초 뒤에 '다음'
+ * 녹음 버튼은 문장 발음 두 번을 끝까지 들어야 켜진다 (중간에 '문장 듣기'를 다시 누르면 그 두 번을 다시 다 들어야). */
 function showSentence(w, next) {
   const st = app.state;
   const sess = st.session;
   const practice = st.settings.speak !== false && speak.isAvailable();
-  const twice = () => audio.play([audio.sentenceSrc(w.id, true), audio.sentenceSrc(w.id, true)], { gap: 700 });
+  let heard = false; // 문장 두 번을 끝까지 들었나
+  let playing = 0; // 진행 중인 '두 번 듣기' 수 — 다시 누르면 앞의 것은 끊기고 새 것을 끝까지 들어야 한다
+  let onHeard = () => {};
+  const twice = async () => {
+    playing += 1;
+    const ok = await audio.play([audio.sentenceSrc(w.id, true), audio.sentenceSrc(w.id, true)], { gap: 700 });
+    playing -= 1;
+    // 끝까지 들었거나, 소리를 낼 수 없어 바로 끝난 경우(음소거·오류)에는 녹음을 열어 준다 — 막히지 않게
+    if (ok || playing === 0) {
+      if (!heard) {
+        heard = true;
+        onHeard();
+      }
+    }
+    return ok;
+  };
   openSheet(
     (sh) => {
       sh.classList.add('sheet--line');
@@ -377,7 +393,13 @@ function showSentence(w, next) {
       mic.append(micIcon(), micLabel);
       const dots = el('div', 'rec-dots');
       for (let i = 0; i < speak.TIMES; i += 1) dots.appendChild(el('i'));
-      const sayLine = el('p', 'speak-say', '문장을 듣고 똑같이 말해 봐!');
+      const sayLine = el('p', 'speak-say', '문장을 두 번 잘 들어 봐!');
+      mic.disabled = !heard;
+      onHeard = () => {
+        mic.disabled = false;
+        mic.classList.add('is-ready');
+        sayLine.textContent = '이제 따라 말해 봐!';
+      };
       const mineRow = el('div', 'helper-row mine-row');
       box.append(mic, dots, sayLine, mineRow);
       const tools = el('div', 'helper-row');
@@ -404,6 +426,8 @@ function showSentence(w, next) {
           rec.stop();
           return;
         }
+        if (!heard) return;
+        mic.classList.remove('is-ready');
         audio.stop();
         mic.classList.add('is-on');
         micLabel.textContent = '다 했어';
