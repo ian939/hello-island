@@ -54,7 +54,8 @@ test('한 판 = 서로 다른 단어: 섬 전체 30장, 동물의 숲은 30장 �
   const words = s.order.map((id) => s.cards[id].word);
   assert.equal(words.length, 30);
   assert.equal(new Set(words).size, 30);
-  assert.ok(s.intro.length <= 5);
+  // 처음 보는 단어는 전부 미리 만나기에 나온다
+  assert.deepEqual([...s.intro].sort(), [...words].sort()); // 첫 판은 30개 모두 처음
 
   const st2 = fresh(c);
   const z = newDaily(c, st2, 'age6-animals').s;

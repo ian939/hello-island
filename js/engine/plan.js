@@ -11,7 +11,6 @@ import { isMastered } from './progress.js';
 
 export const MAX_CARDS = 30;
 export const MIN_CARDS = 10;
-export const INTRO_LIMIT = 5; // 판 시작 전에 미리 만나는 새 단어는 최대 5개
 
 export const flagOf = (state, id) => (state.flags && state.flags[id]) || null;
 
@@ -104,7 +103,8 @@ export function planSession(content, state, { zoneId = null, today, rng, max = M
     for (const b of buckets) picked = picked.concat(b.list.slice(0, b.n));
   }
   if (!picked.length) return null;
-  const intro = picked.filter((id) => !isSeen(state, id)).slice(0, INTRO_LIMIT);
+  // 이번 판에 처음 나오는 단어는 전부 미리 만난다 (문제에 나올 새 단어를 빠짐없이 먼저 듣고 보게)
+  const intro = picked.filter((id) => !isSeen(state, id));
   return { sequence: shuffle(picked, rng), intro };
 }
 
